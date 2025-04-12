@@ -1,100 +1,83 @@
 package app
 
 import (
-	"database/sql"
+	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
-	"strings"
+	"time"
+
+	"github.com/Van-programan/Forum_GO/pkg/logger"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 type Migrator struct {
-	db *sql.DB
-	fs fs.FS
+	migrate *migrate.Migrate
+	logger  logger.Interface
 }
 
-func NewMigrator(db *sql.DB) *Migrator {
-	return &Migrator{
-		db: db,
-		fs: os.DirFS(filepath.Join("..", "..", "migrations")),
-	}
-}
-
-func (m *Migrator) Apply() error {
-	entries, err := fs.ReadDir(m.fs, ".")
+func NewMigrator(dbURL string, logger logger.Interface) *Migrator {
+	migrationsPath, err := filepath.Abs(filepath.Join("..", "..", "migrations"))
 	if err != nil {
-		return fmt.Errorf("failed to read migrations dir: %w", err)
-	}
-
-	var upFiles []string
-	for _, entry := range entries {
-		name := entry.Name()
-		if strings.HasSuffix(name, ".up.sql") {
-			upFiles = append(upFiles, name)
-		}
-	}
-
-	sort.Slice(upFiles, func(i, j int) bool {
-		return getMigrationNumber(upFiles[i]) < getMigrationNumber(upFiles[j])
-	})
-
-	for _, file := range upFiles {
-		content, err := fs.ReadFile(m.fs, file)
-		if err != nil {
-			return fmt.Errorf("failed to read %s: %w", file, err)
-		}
-
-		if _, err := m.db.Exec(string(content)); err != nil {
-			return fmt.Errorf("failed to execute %s: %w", file, err)
-		}
-	}
-
-	return nil
-}
-
-func (m *Migrator) Rollback() error {
-	entries, err := fs.ReadDir(m.fs, ".")
-	if err != nil {
-		return fmt.Errorf("failed to read migrations dir: %w", err)
-	}
-
-	var downFiles []string
-	for _, entry := range entries {
-		name := entry.Name()
-		if strings.HasSuffix(name, ".down.sql") {
-			downFiles = append(downFiles, name)
-		}
-	}
-
-	if len(downFiles) == 0 {
+		logger.Error("failed to get migrations path: %w", err)
 		return nil
 	}
 
-	sort.Slice(downFiles, func(i, j int) bool {
-		return getMigrationNumber(downFiles[i]) > getMigrationNumber(downFiles[j])
-	})
+	logger.Info("Initializing migrator", "path", migrationsPath)
 
-	lastDown := downFiles[0]
-	content, err := fs.ReadFile(m.fs, lastDown)
+	sourceURL := fmt.Sprintf("file://%s", migrationsPath)
+	fullDBURL := fmt.Sprintf("%s?sslmode=disable", dbURL)
+
+	var m *migrate.Migrate
+	attempts := 3
+	for i := 0; i < attempts; i++ {
+		m, err = migrate.New(sourceURL, fullDBURL)
+		if err == nil {
+			break
+		}
+
+		logger.Warn(fmt.Sprintf("Migration connection attempt failed (attempt %d/%d): %v", i+1, attempts, err))
+		time.Sleep(2 * time.Second)
+	}
+
 	if err != nil {
-		return fmt.Errorf("failed to read %s: %w", lastDown, err)
+		logger.Error(fmt.Errorf("failed to initialize migrator: %w", err))
+		return nil
 	}
 
-	if _, err := m.db.Exec(string(content)); err != nil {
-		return fmt.Errorf("failed to execute %s: %w", lastDown, err)
-	}
-
-	return nil
+	logger.Info("Migrator initialized successfully")
+	return &Migrator{migrate: m, logger: logger}
 }
 
-func getMigrationNumber(filename string) int {
-	parts := strings.Split(filename, "_")
-	if len(parts) == 0 {
-		return 0
+func (m *Migrator) Up() {
+	if err := m.migrate.Up(); err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			m.logger.Info("No new migrations to apply")
+		}
+
+		m.logger.Error(fmt.Errorf("failed to apply migrations: %w", err))
 	}
-	num, _ := strconv.Atoi(parts[0])
-	return num
+
+	m.logger.Info("Migrations applied successfully")
+}
+
+func (m *Migrator) Down() {
+	if err := m.migrate.Down(); err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			m.logger.Info("No migrations to rollback")
+		}
+
+		m.logger.Error("Failed to rollback migrations")
+	}
+
+	m.logger.Info("Migrations rolled back successfully")
+}
+
+func (m *Migrator) Close() {
+	if m.migrate != nil {
+		if sourceErr, dbErr := m.migrate.Close(); sourceErr != nil || dbErr != nil {
+			m.logger.Error("source error: %v, database error: %v", sourceErr, dbErr)
+		}
+	}
 }
