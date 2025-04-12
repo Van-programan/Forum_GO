@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/Van-programan/Forum_GO/config"
+	"github.com/Van-programan/Forum_GO/pkg/logger"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/zerolog"
 )
 
 type Postgres struct {
 	Pool *pgxpool.Pool
-	log  *zerolog.Logger
+	log  logger.Logger
 }
 
 var poolConfig = &pgxpool.Config{
@@ -23,12 +23,13 @@ var poolConfig = &pgxpool.Config{
 	HealthCheckPeriod: time.Minute,
 }
 
-func newPostgres(ctx context.Context, dsn string, logger *zerolog.Logger) (*Postgres, error) {
+func newPostgres(ctx context.Context, dsn string, logger logger.Logger) *Postgres {
 	const op = "storage.postgres.New"
 
 	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
+		logger.Error("%s: %w", op, err)
+		return nil
 	}
 
 	poolCfg.MaxConns = poolConfig.MaxConns
@@ -39,22 +40,24 @@ func newPostgres(ctx context.Context, dsn string, logger *zerolog.Logger) (*Post
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
+		logger.Error("%s: %w", op, err)
+		return nil
 	}
 
 	if err := pool.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("%s: ping failed: %w", op, err)
+		logger.Error("%s: ping failed: %w", op, err)
+		return nil
 	}
 
-	logger.Info().Msg("PostgreSQL connected successfully")
+	logger.Info("PostgreSQL connected successfully")
 
 	return &Postgres{
 		Pool: pool,
 		log:  logger,
-	}, nil
+	}
 }
 
-func NewPostgresAuth(ctx context.Context, cfg *config.ConfigAuth, logger *zerolog.Logger) (*Postgres, error) {
+func NewPostgresAuth(ctx context.Context, cfg *config.ConfigAuth, logger logger.Logger) *Postgres {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		cfg.PGAuth.DBHost,
 		cfg.PGAuth.DBPort,
@@ -66,7 +69,7 @@ func NewPostgresAuth(ctx context.Context, cfg *config.ConfigAuth, logger *zerolo
 	return newPostgres(ctx, dsn, logger)
 }
 
-func NewPostgresForum(ctx context.Context, cfg *config.ConfigForum, logger *zerolog.Logger) (*Postgres, error) {
+func NewPostgresForum(ctx context.Context, cfg *config.ConfigForum, logger logger.Logger) *Postgres {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		cfg.PGForum.DBHost,
 		cfg.PGForum.DBPort,
@@ -81,6 +84,6 @@ func NewPostgresForum(ctx context.Context, cfg *config.ConfigForum, logger *zero
 func (p *Postgres) Close() {
 	if p.Pool != nil {
 		p.Pool.Close()
-		p.log.Info().Msg("PostgreSQL connection closed")
+		p.log.Info("PostgreSQL connection closed")
 	}
 }
