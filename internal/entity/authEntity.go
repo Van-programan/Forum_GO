@@ -13,8 +13,6 @@ type User struct {
 type Session struct {
 	ID                    int64     `json:"id" db:"id"`
 	UserID                int64     `json:"user_id" db:"user_id"`
-	AccessToken           string    `json:"access_token" db:"access_token"`
 	RefreshToken          string    `json:"refresh_token" db:"refresh_token"`
-	ExpiresAtAccessToken  time.Time `json:"access_token_expires_at" db:"access_token_expires_at"`
 	ExpiresAtRefreshToken time.Time `json:"refresh_token_expires_at" db:"refresh_token_expires_at"`
 }
