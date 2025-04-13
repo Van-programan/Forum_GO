@@ -12,7 +12,7 @@ import (
 
 type MessageRepository interface {
 	CreateMessage(ctx context.Context, message *entity.Message) error
-	GetMessages(ctx context.Context) ([]entity.Message, error)
+	GetMessages(ctx context.Context, topic_id int64) ([]entity.Message, error)
 	DeleteMessage(ctx context.Context, id int64) error
 }
 type TopicRepository interface {
@@ -58,13 +58,14 @@ func (r *messageRepo) CreateMessage(ctx context.Context, message *entity.Message
 	return nil
 }
 
-func (r *messageRepo) GetMessages(ctx context.Context) ([]entity.Message, error) {
+func (r *messageRepo) GetMessages(ctx context.Context, topic_id int64) ([]entity.Message, error) {
 	query := `
 		SELECT id, topic_id, user_id, content, created_at
 		FROM messages
+		WHERE topic_id = $1
 		ORDER BY created_at DESC`
 
-	rows, err := r.pg.Pool.Query(ctx, query)
+	rows, err := r.pg.Pool.Query(ctx, query, topic_id)
 	if err != nil {
 		return nil, fmt.Errorf("messageRepo.GetMessages: %w", err)
 	}

@@ -13,6 +13,7 @@ import (
 type UserRepository interface {
 	CreateUser(ctx context.Context, user *entity.User) error
 	GetUsers(ctx context.Context) ([]entity.User, error)
+	GetUserByID(ctx context.Context, id int64) (*entity.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*entity.User, error)
 	UpdateUser(ctx context.Context, user *entity.User) error
 	DeleteUser(ctx context.Context, id int64) error
@@ -100,6 +101,30 @@ func (r *userRepo) GetUserByEmail(ctx context.Context, email string) (*entity.Us
 
 	var user entity.User
 	err := r.pg.Pool.QueryRow(ctx, query, email).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.Password,
+		&user.RegisteredAt,
+	)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("authRepo.GetUserByEmail: %w", err)
+	}
+	return &user, nil
+}
+
+func (r *userRepo) GetUserByID(ctx context.Context, id int64) (*entity.User, error) {
+	query := `
+		SELECT id, username, email, password_hash, registered_at
+		FROM users
+		WHERE id = $1`
+
+	var user entity.User
+	err := r.pg.Pool.QueryRow(ctx, query, id).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,
