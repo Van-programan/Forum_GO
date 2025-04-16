@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -17,16 +18,21 @@ type Migrator struct {
 	logger  logger.Interface
 }
 
-func NewMigrator(dbURL string, logger logger.Interface) *Migrator {
-	migrationsPath, err := filepath.Abs(filepath.Join("..", "..", "migrations"))
+func NewMigrator(dbURL, migrationsPath string, logger logger.Interface) *Migrator {
+	if _, err := os.Stat(migrationsPath); os.IsNotExist(err) {
+		logger.Error("migrations directory does not exist: %s", migrationsPath)
+		return nil
+	}
+
+	absPath, err := filepath.Abs(migrationsPath)
 	if err != nil {
 		logger.Error("failed to get migrations path: %w", err)
 		return nil
 	}
 
-	logger.Info("Initializing migrator", "path", migrationsPath)
+	logger.Info("Initializing migrator", "path", absPath)
 
-	sourceURL := fmt.Sprintf("file://%s", migrationsPath)
+	sourceURL := fmt.Sprintf("file://%s", absPath)
 	fullDBURL := fmt.Sprintf("%s?sslmode=disable", dbURL)
 
 	var m *migrate.Migrate
