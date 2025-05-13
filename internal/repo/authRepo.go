@@ -33,7 +33,7 @@ type userRepo struct {
 	pg *postgres.Postgres
 }
 
-func NewAuthRepository(pg *postgres.Postgres) UserRepository {
+func NewUserRepository(pg *postgres.Postgres) UserRepository {
 	return &userRepo{pg: pg}
 }
 

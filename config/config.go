@@ -33,15 +33,13 @@ type (
 	}
 
 	AuthInfo struct {
-		HTTPPort int           `env:"AUTH_SERVICE_HTTP_PORT" envDefault:"8040"`
-		GRPCPort int           `env:"AUTH_SERVICE_GRPC_PORT" envDefault:"50051"`
+		GRPCPort string        `env:"AUTH_SERVICE_GRPC_PORT" envDefault:"50051"`
 		Timeout  time.Duration `env:"TIMEOUT" envDefault:"30s"`
 	}
 
 	ForumInfo struct {
-		HTTPPort int           `env:"FORUM_SERVICE_HTTP_PORT" envDefault:"8041"`
-		GRPCPort int           `env:"FORUM_SERVICE_GRPC_PORT" envDefault:"50052"`
-		WSPort   int           `env:"FORUM_SERVICE_WS_PORT" envDefault:"8042"`
+		GRPCPort string        `env:"FORUM_SERVICE_GRPC_PORT" envDefault:"50052"`
+		WSPort   string        `env:"FORUM_SERVICE_WS_PORT" envDefault:"8042"`
 		Timeout  time.Duration `env:"TIMEOUT" envDefault:"30s"`
 	}
 

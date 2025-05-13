@@ -13,12 +13,15 @@ import (
 
 type AuthGRPCController struct {
 	authservice.UnimplementedAuthServiceServer
-	authUC usecase.AuthUseCase
+	authUC usecase.Auth
 	tm     tokens.TokenManager
 }
 
-func NewAuthController(authUC usecase.AuthUseCase, tm tokens.TokenManager) AuthGRPCController {
-	return AuthGRPCController{authUC: authUC, tm: tm}
+func NewAuthController(authUC usecase.Auth, tm tokens.TokenManager) AuthGRPCController {
+	return AuthGRPCController{
+		authUC: authUC,
+		tm:     tm,
+	}
 }
 
 func (c *AuthGRPCController) Register(ctx context.Context, req *authservice.RegisterRequest) (*authservice.RegisterResponse, error) {

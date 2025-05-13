@@ -15,7 +15,7 @@ type ForumGRPCController struct {
 	forumUC usecase.Forum
 }
 
-func NewForumGRPCController(forumUC usecase.Forum) *ForumGRPCController {
+func NewForumController(forumUC usecase.Forum) *ForumGRPCController {
 	return &ForumGRPCController{forumUC: forumUC}
 }
 
