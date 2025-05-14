@@ -23,7 +23,7 @@ import (
 
 func RunForumService() {
 	logger := logger.New("info")
-	logger.Info("Starting auth service...")
+	logger.Info("Starting forum service...")
 
 	cfg, err := config.NewConfigForum()
 	if err != nil {
