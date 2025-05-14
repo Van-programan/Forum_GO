@@ -48,8 +48,8 @@ type (
 	}
 
 	PGConfig struct {
-		DBHost     string `env:"DB_HOST,required"`
-		DBPort     int    `env:"DB_PORT,required"`
+		DBHost     string `env:"DB_HOST" envDefault:"localhost"`
+		DBPort     int    `env:"DB_PORT" envDefault:"5432"`
 		DBUser     string `env:"DB_USER,required"`
 		DBPassword string `env:"DB_PASSWORD,required"`
 		DBSSLMode  string `env:"DB_SSLMODE" envDefault:"disable"`
