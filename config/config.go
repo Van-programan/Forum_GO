@@ -27,9 +27,9 @@ type (
 	}
 
 	App struct {
-		AppName     string `env:"APP_NAME,required"`
+		AppName     string `env:"APP_NAME" envDefault:"Forum_go"`
 		Environment string `env:"ENVIRONMENT" envDefault:"development"`
-		AppVersion  string `env:"APP_VERSION,required"`
+		AppVersion  string `env:"APP_VERSION" envDefault:"1.0.0"`
 	}
 
 	AuthInfo struct {
@@ -50,24 +50,24 @@ type (
 	PGConfig struct {
 		DBHost     string `env:"DB_HOST" envDefault:"localhost"`
 		DBPort     int    `env:"DB_PORT" envDefault:"5432"`
-		DBUser     string `env:"DB_USER,required"`
-		DBPassword string `env:"DB_PASSWORD,required"`
+		DBUser     string `env:"DB_USER" envDefault:"postgres"`
+		DBPassword string `env:"DB_PASSWORD" envDefault:"1234"`
 		DBSSLMode  string `env:"DB_SSLMODE" envDefault:"disable"`
 	}
 
 	PGAuth struct {
 		PGConfig
-		DBName string `env:"AUTH_DB_NAME,required"`
+		DBName string `env:"AUTH_DB_NAME" envDefault:"auth"`
 	}
 
 	PGForum struct {
 		PGConfig
-		DBName string `env:"FORUM_DB_NAME,required"`
+		DBName string `env:"FORUM_DB_NAME" envDefault:"forum"`
 	}
 
 	JWT struct {
-		JWTSecretKey      string        `env:"JWT_SECRET_KEY,required"`
-		JWTExpirationTime time.Duration `env:"JWT_EXPIRATION,required"`
+		JWTSecretKey      string        `env:"JWT_SECRET_KEY" envDefault:"very-secret-key-which-impossible-hack"`
+		JWTExpirationTime time.Duration `env:"JWT_EXPIRATION" envDefault:"15m"`
 	}
 
 	AddressAuth struct {

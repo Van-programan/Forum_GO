@@ -3,10 +3,13 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/Van-programan/Forum_GO/internal/entity"
 	"github.com/Van-programan/Forum_GO/internal/repo"
+	"github.com/Van-programan/Forum_GO/internal/ws"
+	"github.com/Van-programan/Forum_GO/pkg/tokens"
 )
 
 type Forum interface {
@@ -19,17 +22,27 @@ type Forum interface {
 	CreateMessage(ctx context.Context, topicID, userID int64, content string) (*entity.Message, error)
 	GetMessages(ctx context.Context, topicID int64) ([]*entity.Message, error)
 	DeleteMessage(ctx context.Context, id int64) error
+
+	RegisterWSClient(topicID string, client *ws.Client)
+	BroadcastNewMessage(msg *entity.Message) error
+	CanAccessTopic(userID int64, topicID string) bool
+	ValidateToken(token string) (int64, error)
 }
 
 type ForumUseCase struct {
 	topicRepo   repo.TopicRepository
 	messageRepo repo.MessageRepository
+	wsHub       *ws.Hub
+	tm          tokens.TokenManager
 }
 
-func NewForumUseCase(topicRepo repo.TopicRepository, messageRepo repo.MessageRepository) Forum {
+func NewForumUseCase(topicRepo repo.TopicRepository, messageRepo repo.MessageRepository,
+	wsHub *ws.Hub, tm tokens.TokenManager) Forum {
 	return &ForumUseCase{
 		topicRepo:   topicRepo,
 		messageRepo: messageRepo,
+		wsHub:       wsHub,
+		tm:          tm,
 	}
 }
 
@@ -126,4 +139,46 @@ func (uc *ForumUseCase) GetMessages(ctx context.Context, topicID int64) ([]*enti
 
 func (uc *ForumUseCase) DeleteMessage(ctx context.Context, id int64) error {
 	return uc.messageRepo.DeleteMessage(ctx, id)
+}
+
+func (uc *ForumUseCase) RegisterWSClient(topicID string, client *ws.Client) {
+	uc.wsHub.RegisterClient(client)
+
+	uc.wsHub.BroadcastToTopic(topicID, ws.Message{
+		Type: "user_joined",
+		Payload: map[string]interface{}{
+			"user_id": client.UserID,
+		},
+	})
+}
+
+func (uc *ForumUseCase) BroadcastNewMessage(msg *entity.Message) error {
+	uc.wsHub.BroadcastToTopic(strconv.FormatInt(msg.TopicID, 10), ws.Message{
+		Type: "new_message",
+		Payload: map[string]interface{}{
+			"id":         msg.ID,
+			"user_id":    msg.UserID,
+			"content":    msg.Content,
+			"created_at": msg.CreatedAt,
+		},
+	})
+	return nil
+}
+
+func (uc *ForumUseCase) CanAccessTopic(userID int64, topicID string) bool {
+	id, err := strconv.ParseInt(topicID, 10, 64)
+	if err != nil {
+		return false
+	}
+
+	topic, err := uc.topicRepo.GetTopicByID(context.Background(), id)
+	if err != nil {
+		return false
+	}
+
+	return topic != nil
+}
+
+func (uc *ForumUseCase) ValidateToken(token string) (int64, error) {
+	return uc.tm.ParseAccessToken(token)
 }

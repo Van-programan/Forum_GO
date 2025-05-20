@@ -14,10 +14,12 @@ import (
 	"github.com/Van-programan/Forum_GO/internal/controller"
 	"github.com/Van-programan/Forum_GO/internal/repo"
 	"github.com/Van-programan/Forum_GO/internal/usecase"
+	"github.com/Van-programan/Forum_GO/internal/ws"
 	"github.com/Van-programan/Forum_GO/pkg/logger"
 	"github.com/Van-programan/Forum_GO/pkg/migrator"
 	"github.com/Van-programan/Forum_GO/pkg/postgres"
 	"github.com/Van-programan/Forum_GO/pkg/proto/forumservice"
+	"github.com/Van-programan/Forum_GO/pkg/tokens"
 	"google.golang.org/grpc"
 )
 
@@ -26,6 +28,11 @@ func RunForumService() {
 	logger.Info("Starting forum service...")
 
 	cfg, err := config.NewConfigForum()
+	if err != nil {
+		logger.Fatal("Failed to load config", err)
+	}
+
+	cfgAuth, err := config.NewConfigAuth()
 	if err != nil {
 		logger.Fatal("Failed to load config", err)
 	}
@@ -58,7 +65,12 @@ func RunForumService() {
 	messageRepo := repo.NewMessageRepository(pg)
 	topicRepo := repo.NewTopicRepository(pg)
 
-	forumUC := usecase.NewForumUseCase(topicRepo, messageRepo)
+	wsHub := ws.NewHub()
+	go wsHub.Run()
+
+	tokenManager := tokens.NewTokenManager(cfgAuth.JWT.JWTSecretKey)
+
+	forumUC := usecase.NewForumUseCase(topicRepo, messageRepo, wsHub, tokenManager)
 
 	grpcServer := grpc.NewServer(
 		grpc.UnaryInterceptor(loggingInterceptor(logger)),
