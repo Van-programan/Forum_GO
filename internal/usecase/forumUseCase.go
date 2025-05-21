@@ -8,7 +8,8 @@ import (
 
 	"github.com/Van-programan/Forum_GO/internal/entity"
 	"github.com/Van-programan/Forum_GO/internal/repo"
-	"github.com/Van-programan/Forum_GO/internal/ws"
+	"github.com/Van-programan/Forum_GO/internal/transport/ws"
+
 	"github.com/Van-programan/Forum_GO/pkg/tokens"
 )
 

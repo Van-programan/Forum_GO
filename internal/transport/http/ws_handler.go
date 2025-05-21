@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Van-programan/Forum_GO/internal/transport/ws"
 	"github.com/Van-programan/Forum_GO/internal/usecase"
-	"github.com/Van-programan/Forum_GO/internal/ws"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
@@ -65,7 +65,6 @@ func (h *WSHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	h.forumUC.RegisterWSClient(topicID, client)
 
 	go client.WritePump()
-	go client.ReadPump(h.forumUC)
 }
 
 func generateClientID() string {
