@@ -4,5 +4,6 @@ import "github.com/Van-programan/Forum_GO/internal/app"
 
 func main() {
 	app.RunAuthServer()
-	app.RunForumService()
+	app.RunForumServer()
+	app.RunGrpcServer()
 }

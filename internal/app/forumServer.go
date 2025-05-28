@@ -23,25 +23,17 @@ import (
 	"github.com/Van-programan/Forum_GO/pkg/postgres"
 )
 
-func RunForumService() {
+func RunForumServer() {
 
 	cfg, err := config.NewConfigForum()
 	if err != nil {
-		log.Fatalf("Failed to load config", err)
+		log.Fatal("Failed to load config", err)
 	}
 
 	logger := logger.New("forum-service", cfg.Log.LogLevel)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	pg := postgres.NewPostgresForum(ctx, cfg)
-	if pg == nil {
-		log.Fatalf("Failed to connect to database")
-	}
-	defer pg.Close()
-
-	log.Fatalf("Successfully connected to database")
 
 	dbURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
 		cfg.PGForum.DBUser,
@@ -50,6 +42,14 @@ func RunForumService() {
 		cfg.PGForum.DBPort,
 		cfg.PGForum.DBName,
 	)
+
+	pg := postgres.NewPostgresForum(ctx, dbURL)
+	if pg == nil {
+		log.Fatalf("Failed to connect to database")
+	}
+	defer pg.Close()
+
+	log.Fatalf("Successfully connected to database")
 
 	migrationsPath := filepath.Join("migrations", "forum")
 

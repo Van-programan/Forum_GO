@@ -124,6 +124,10 @@ func (u *authUsecase) Login(ctx context.Context, username, password, refreshToke
 func (u *authUsecase) Refresh(ctx context.Context, refreshToken string) (*response.RefreshResponse, error) {
 	log := u.log.With().Str("op", refreshOp).Logger()
 
+	if refreshToken == "" {
+		return nil, errors.New("empty refresh token")
+	}
+
 	claims, err := u.jwt.ParseToken(refreshToken)
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to parse refresh token")

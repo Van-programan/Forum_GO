@@ -57,8 +57,8 @@ func NewForumRouter(engine *gin.Engine, categoryUsecase usecase.CategoryUsecase,
 		}
 	}
 
-	engine.GET("/categories/:id/topics", topicHandler.GetByCategory)
-	engine.POST("/categories/:id/topics", auth.Auth(), topicHandler.Create)
+	engine.GET("/categories/topics/:id", topicHandler.GetByCategory)
+	engine.POST("/categories/topics/:id/", auth.Auth(), topicHandler.Create)
 
 	engine.GET("/topics/:id", topicHandler.GetByID)
 	topics := engine.Group("/topics").Use(auth.Auth())

@@ -33,7 +33,8 @@ type (
 	}
 
 	AuthInfo struct {
-		Server string `env:"AUTH_SERVICE" envDefault:"3100"`
+		Server   string `env:"AUTH_SERVICE" envDefault:"3100"`
+		GRPCPort string `env:"GRPC_PORT" envDefault:"50051"`
 	}
 
 	ForumInfo struct {

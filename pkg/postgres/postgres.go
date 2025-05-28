@@ -2,10 +2,8 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"github.com/Van-programan/Forum_GO/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -49,28 +47,12 @@ func newPostgres(ctx context.Context, dsn string) *Postgres {
 	}
 }
 
-func NewPostgresAuth(ctx context.Context, cfg *config.ConfigAuth) *Postgres {
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		cfg.PGAuth.DBHost,
-		cfg.PGAuth.DBPort,
-		cfg.PGAuth.DBUser,
-		cfg.PGAuth.DBPassword,
-		cfg.PGAuth.DBName,
-		cfg.PGAuth.DBSSLMode,
-	)
-	return newPostgres(ctx, dsn)
+func NewPostgresAuth(ctx context.Context, url string) *Postgres {
+	return newPostgres(ctx, url)
 }
 
-func NewPostgresForum(ctx context.Context, cfg *config.ConfigForum) *Postgres {
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		cfg.PGForum.DBHost,
-		cfg.PGForum.DBPort,
-		cfg.PGForum.DBUser,
-		cfg.PGForum.DBPassword,
-		cfg.PGForum.DBName,
-		cfg.PGForum.DBSSLMode,
-	)
-	return newPostgres(ctx, dsn)
+func NewPostgresForum(ctx context.Context, url string) *Postgres {
+	return newPostgres(ctx, url)
 }
 
 func (p *Postgres) Close() {

@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -41,9 +42,13 @@ func (j *JWT) GenerateRefreshToken(userID int64) (string, error) {
 }
 
 func (j *JWT) ParseToken(tokenStr string) (*jwt.MapClaims, error) {
-	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+	if tokenStr == "" {
+		return nil, errors.New("empty token string")
+	}
+
+	token, err := jwt.ParseWithClaims(tokenStr, &jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(j.secretKey), nil
 	})
@@ -52,14 +57,9 @@ func (j *JWT) ParseToken(tokenStr string) (*jwt.MapClaims, error) {
 		return nil, err
 	}
 
-	if !token.Valid {
-		return nil, jwt.ErrInvalidKey
+	if claims, ok := token.Claims.(*jwt.MapClaims); ok && token.Valid {
+		return claims, nil
 	}
 
-	claimsMap, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, errors.New("invalid token claims")
-	}
-
-	return &claimsMap, nil
+	return nil, errors.New("invalid token")
 }

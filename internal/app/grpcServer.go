@@ -4,31 +4,29 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
-
 	"syscall"
 	"time"
 
 	"github.com/Van-programan/Forum_GO/config"
-	"github.com/Van-programan/Forum_GO/internal/controller/route"
+	"github.com/Van-programan/Forum_GO/internal/controller/grpc"
 	"github.com/Van-programan/Forum_GO/internal/repo"
 	"github.com/Van-programan/Forum_GO/internal/usecase"
-	"github.com/Van-programan/Forum_GO/pkg/httpserver"
-	"github.com/Van-programan/Forum_GO/pkg/jwt"
 	"github.com/Van-programan/Forum_GO/pkg/logger"
-	"github.com/Van-programan/Forum_GO/pkg/migrator"
 	"github.com/Van-programan/Forum_GO/pkg/postgres"
+	Grpc "google.golang.org/grpc"
 )
 
-func RunAuthServer() {
+func RunGrpcServer() {
 
 	cfg, err := config.NewConfigAuth()
 	if err != nil {
 		log.Fatal("Failed to load config", err)
 	}
 
-	logger := logger.New("auth-service", cfg.Log.LogLevel)
+	logger := logger.New("user-service", cfg.Log.LogLevel)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -47,25 +45,24 @@ func RunAuthServer() {
 	}
 	defer pg.Close()
 
-	log.Fatalf("Successfully connected to database")
+	userRepo := repo.New(pg, logger)
 
-	migrationsPath := "migrations/auth"
+	userUsecase := usecase.New(userRepo, logger)
 
-	migrator := migrator.NewMigrator(dbURL, migrationsPath, *logger)
-	defer migrator.Close()
-	migrator.Up()
+	grpcServer := Grpc.NewServer()
+	grpc.Register(grpcServer, userUsecase, logger)
 
-	userRepo := repo.NewUserRepository(pg, logger)
-	tokenRepo := repo.NewRefreshTokenRepository(pg, logger)
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.AuthInfo.GRPCPort))
+	if err != nil {
+		log.Fatalf("app - Run - net.Listen: %v", err)
+	}
 
-	jwt := jwt.New(cfg.JWT.Secret, cfg.JWT.Access_TTL, cfg.JWT.Refresh_TTL)
+	go func() {
+		if err := grpcServer.Serve(l); err != nil {
+			log.Fatalf("app - Run - grpcServer.Serve: %v", err)
+		}
+	}()
 
-	authUC := usecase.NewAuthUsecase(userRepo, tokenRepo, jwt, logger)
-
-	httpServer := httpserver.New(cfg.AuthInfo.Server)
-	route.NewAuthRouter(httpServer.Engine, authUC, jwt, logger)
-
-	httpServer.Run()
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 	<-interrupt
