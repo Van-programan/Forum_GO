@@ -18,12 +18,12 @@ type (
 	}
 
 	ConfigForum struct {
-		App         App
-		ForumInfo   ForumInfo
-		Log         Log
-		AddressAuth AddressAuth
-		PGForum     PGForum
-		Swagger     Swagger
+		App       App
+		ForumInfo ForumInfo
+		Log       Log
+		PGForum   PGForum
+		Swagger   Swagger
+		JWT       JWT
 	}
 
 	App struct {
@@ -33,14 +33,12 @@ type (
 	}
 
 	AuthInfo struct {
-		GRPCPort string        `env:"AUTH_SERVICE_GRPC_PORT" envDefault:"50051"`
-		Timeout  time.Duration `env:"TIMEOUT" envDefault:"30s"`
+		Server string `env:"AUTH_SERVICE" envDefault:"3100"`
 	}
 
 	ForumInfo struct {
-		GRPCPort string        `env:"FORUM_SERVICE_GRPC_PORT" envDefault:"50052"`
-		WSPort   string        `env:"FORUM_SERVICE_WS_PORT" envDefault:"8042"`
-		Timeout  time.Duration `env:"TIMEOUT" envDefault:"30s"`
+		Server   string `env:"FORUM_SERVICE" envDefault:"3101"`
+		GRPCPort string `env:"GRPC_PORT" envDefault:"50051"`
 	}
 
 	Log struct {
@@ -66,12 +64,9 @@ type (
 	}
 
 	JWT struct {
-		JWTSecretKey      string        `env:"JWT_SECRET_KEY" envDefault:"very-secret-key-which-impossible-hack"`
-		JWTExpirationTime time.Duration `env:"JWT_EXPIRATION" envDefault:"15m"`
-	}
-
-	AddressAuth struct {
-		Address string `env:"AUTH_SERVICE_ADDR" envDefault:"localhost:50051"`
+		Access_TTL  time.Duration `env:"ACCESS_TTL" envDefault:"15m"`
+		Refresh_TTL time.Duration `env:"REFRESH_TTL" envDefault:"720h"`
+		Secret      string        `env:"SECRET" envDefault:"very-secret-value-impossible-hack"`
 	}
 
 	Swagger struct {

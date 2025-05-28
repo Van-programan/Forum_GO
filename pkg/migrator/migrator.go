@@ -7,30 +7,39 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Van-programan/Forum_GO/pkg/logger"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/rs/zerolog"
 )
 
 type Migrator struct {
 	migrate *migrate.Migrate
-	logger  logger.Interface
+	logger  zerolog.Logger
 }
 
-func NewMigrator(dbURL, migrationsPath string, logger logger.Interface) *Migrator {
+func NewMigrator(dbURL, migrationsPath string, logger zerolog.Logger) *Migrator {
+	log := logger.With().Str("component", "migrator").Logger()
+
 	if _, err := os.Stat(migrationsPath); os.IsNotExist(err) {
-		logger.Error("migrations directory does not exist: %s", migrationsPath)
+		log.Error().
+			Str("path", migrationsPath).
+			Msg("Migrations directory does not exist")
 		return nil
 	}
 
 	absPath, err := filepath.Abs(migrationsPath)
 	if err != nil {
-		logger.Error("failed to get migrations path: %w", err)
+		log.Error().
+			Err(err).
+			Str("path", migrationsPath).
+			Msg("Failed to get absolute path to migrations")
 		return nil
 	}
 
-	logger.Info("Initializing migrator", "path", absPath)
+	log.Info().
+		Str("path", absPath).
+		Msg("Initializing migrator")
 
 	sourceURL := fmt.Sprintf("file://%s", absPath)
 	fullDBURL := fmt.Sprintf("%s?sslmode=disable", dbURL)
@@ -43,47 +52,82 @@ func NewMigrator(dbURL, migrationsPath string, logger logger.Interface) *Migrato
 			break
 		}
 
-		logger.Warn(fmt.Sprintf("Migration connection attempt failed (attempt %d/%d): %v", i+1, attempts, err))
+		log.Warn().
+			Err(err).
+			Int("attempt", i+1).
+			Int("max_attempts", attempts).
+			Msg("Migration connection attempt failed")
+
 		time.Sleep(2 * time.Second)
 	}
 
 	if err != nil {
-		logger.Error(fmt.Errorf("failed to initialize migrator: %w", err))
+		log.Error().
+			Err(err).
+			Str("db_url", dbURL).
+			Msg("Failed to initialize migrator")
 		return nil
 	}
 
-	logger.Info("Migrator initialized successfully")
-	return &Migrator{migrate: m, logger: logger}
+	log.Info().Msg("Migrator initialized successfully")
+	return &Migrator{
+		migrate: m,
+		logger:  log,
+	}
 }
 
 func (m *Migrator) Up() {
+	log := m.logger.With().Str("operation", "up").Logger()
+
+	log.Info().Msg("Applying migrations...")
+
 	if err := m.migrate.Up(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
-			m.logger.Info("No new migrations to apply")
+			log.Info().Msg("Database is up to date - no migrations applied")
+			return
 		}
 
-		m.logger.Error(fmt.Errorf("failed to apply migrations: %w", err))
+		log.Error().
+			Err(err).
+			Msg("Failed to apply migrations")
+		return
 	}
 
-	m.logger.Info("Migrations applied successfully")
+	log.Info().Msg("Migrations applied successfully")
 }
 
 func (m *Migrator) Down() {
+	log := m.logger.With().Str("operation", "down").Logger()
+
+	log.Info().Msg("Rolling back migrations...")
+
 	if err := m.migrate.Down(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
-			m.logger.Info("No migrations to rollback")
+			log.Info().Msg("No migrations to rollback")
+			return
 		}
 
-		m.logger.Error("Failed to rollback migrations")
+		log.Error().
+			Err(err).
+			Msg("Failed to rollback migrations")
+		return
 	}
 
-	m.logger.Info("Migrations rolled back successfully")
+	log.Info().Msg("Migrations rolled back successfully")
 }
 
 func (m *Migrator) Close() {
 	if m.migrate != nil {
-		if sourceErr, dbErr := m.migrate.Close(); sourceErr != nil || dbErr != nil {
-			m.logger.Error("source error: %v, database error: %v", sourceErr, dbErr)
+		log := m.logger.With().Str("operation", "close").Logger()
+
+		sourceErr, dbErr := m.migrate.Close()
+		if sourceErr != nil || dbErr != nil {
+			log.Error().
+				Err(sourceErr).
+				Err(dbErr).
+				Msg("Error closing migrator")
+		} else {
+			log.Debug().Msg("Migrator closed successfully")
 		}
 	}
 }

@@ -3,151 +3,213 @@ package usecase
 import (
 	"context"
 	"errors"
-	"time"
+	"fmt"
 
+	"github.com/Van-programan/Forum_GO/internal/controller/response"
 	"github.com/Van-programan/Forum_GO/internal/entity"
 	"github.com/Van-programan/Forum_GO/internal/repo"
-	"github.com/Van-programan/Forum_GO/pkg/tokens"
+	"github.com/Van-programan/Forum_GO/pkg/jwt"
+	"github.com/jackc/pgx/v5"
+	"github.com/mitchellh/mapstructure"
+	"github.com/rs/zerolog"
+	"golang.org/x/crypto/bcrypt"
 )
 
-type Auth interface {
-	Register(ctx context.Context, username, email, password string) (*entity.User, error)
-	Login(ctx context.Context, email, password string) (*entity.User, string, string, error)
-	RefreshToken(ctx context.Context, refreshToken string) (*entity.User, string, error)
+type AuthUsecase interface {
+	Register(ctx context.Context, username string, role string, password string) (*response.RegisterResponse, error)
+	Login(ctx context.Context, username, password, refreshToken string) (*response.LoginResponse, error)
+	Refresh(ctx context.Context, refreshToken string) (*response.RefreshResponse, error)
 	Logout(ctx context.Context, refreshToken string) error
-	GetUser(ctx context.Context, id int64) (*entity.User, error)
+	IsSessionActive(ctx context.Context, refreshToken string) (*response.IsSessionActiveResponse, error)
 }
 
-type AuthUseCase struct {
-	userRepo     repo.UserRepository
-	sessionRepo  repo.SessionRepository
-	tokenManager tokens.TokenManager
+type authUsecase struct {
+	userRepo  repo.UserRepository
+	tokenRepo repo.RefreshTokenRepository
+	jwt       *jwt.JWT
+	log       *zerolog.Logger
 }
 
-func NewAuthUseCase(userRepo repo.UserRepository, sessionRepo repo.SessionRepository,
-	tokenManager tokens.TokenManager) Auth {
-	return &AuthUseCase{
-		userRepo:     userRepo,
-		sessionRepo:  sessionRepo,
-		tokenManager: tokenManager,
-	}
+const (
+	registerOp        = "AuthUsecase.Register"
+	loginOp           = "AuthUsecase.Login"
+	refreshOp         = "AuthUsecase.Refresh"
+	logoutOp          = "AuthUsecase.Logout"
+	isSessionActiveOp = "AuthUsecase.IsSessionActive"
+)
+
+func NewAuthUsecase(userRepo repo.UserRepository, tokenRepo repo.RefreshTokenRepository, jwt *jwt.JWT, log *zerolog.Logger) AuthUsecase {
+	return &authUsecase{userRepo: userRepo, tokenRepo: tokenRepo, jwt: jwt, log: log}
 }
 
-func (uc *AuthUseCase) Register(ctx context.Context, username, email, password string) (*entity.User, error) {
-	existingUser, err := uc.userRepo.GetUserByEmail(ctx, email)
+func (u *authUsecase) Register(ctx context.Context, username string, role string, password string) (*response.RegisterResponse, error) {
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	user := &entity.User{Username: username, Role: role, PasswordHash: string(hashedPassword)}
+	id, err := u.userRepo.Create(ctx, user)
 	if err != nil {
+		u.log.Error().Err(err).Str("op", registerOp).Str("username", username).Msg("Failed to create user in repository")
 		return nil, err
 	}
-	if existingUser != nil {
-		return nil, errors.New("user with this email already exists")
-	}
+	u.log.Info().Str("op", registerOp).Str("username", username).Msg("User registered successfully")
 
-	hashedPassword, err := uc.tokenManager.HashPassword(password)
+	access, err := u.jwt.GenerateAccessToken(id, user.Role)
 	if err != nil {
-		return nil, err
+		u.log.Error().Err(err).Str("op", registerOp).Int64("user_id", user.ID).Msg("Failed to generate access token")
+		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	user := &entity.User{
-		Username:     username,
-		Email:        email,
-		Password:     hashedPassword,
-		RegisteredAt: time.Now(),
-	}
-
-	err = uc.userRepo.CreateUser(ctx, user)
+	refresh, err := u.jwt.GenerateRefreshToken(id)
 	if err != nil {
-		return nil, err
+		u.log.Error().Err(err).Str("op", registerOp).Int64("user_id", user.ID).Msg("Failed to generate refresh token")
+		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
 	}
 
-	return user, nil
+	err = u.tokenRepo.Save(ctx, refresh, id)
+	if err != nil {
+		u.log.Error().Err(err).Str("op", registerOp).Int64("user_id", user.ID).Msg("Failed to save refresh token")
+		return nil, fmt.Errorf("failed to save refresh token: %w", err)
+	}
+
+	createdUser, err := u.userRepo.GetByID(ctx, id)
+	if err != nil {
+		u.log.Error().Err(err).Str("op", registerOp).Int64("user_id", user.ID).Msg("Failed to get user in repository")
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return &response.RegisterResponse{User: *createdUser, Tokens: response.Tokens{AccessToken: access, RefreshToken: refresh}}, nil
 }
 
-func (uc *AuthUseCase) Login(ctx context.Context, email, password string) (*entity.User, string, string, error) {
-	user, err := uc.userRepo.GetUserByEmail(ctx, email)
+func (u *authUsecase) Login(ctx context.Context, username, password, refreshToken string) (*response.LoginResponse, error) {
+	log := u.log.With().Str("op", loginOp).Str("username", username).Logger()
+	user, err := u.userRepo.GetByUsername(ctx, username)
 	if err != nil {
-		return nil, "", "", err
-	}
-	if user == nil {
-		return nil, "", "", errors.New("user not found")
+		log.Warn().Err(err).Msg("Failed to get user by username or user not found")
+		return nil, fmt.Errorf("invalid username or password: %w", err)
 	}
 
-	if !uc.tokenManager.CheckPasswordHash(password, user.Password) {
-		return nil, "", "", errors.New("invalid password")
+	if refreshToken != "" {
+		if err := u.tokenRepo.Delete(ctx, refreshToken); err != nil {
+			log.Error().Err(err).Int64("user_id", user.ID).Msg("Failed to delete used refresh token from repository")
+			return nil, fmt.Errorf("failed to delete used refresh token: %w", err)
+		}
 	}
 
-	accessToken, err := uc.tokenManager.GenerateAccessToken(user.ID)
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
+		log.Warn().Msg("Invalid password attempt")
+		return nil, errors.New("invalid username or password")
+	}
+
+	access, err := u.jwt.GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
-		return nil, "", "", err
+		log.Error().Err(err).Int64("user_id", user.ID).Msg("Failed to generate access token")
+		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	refreshToken, err := uc.tokenManager.GenerateRefreshToken()
+	refresh, err := u.jwt.GenerateRefreshToken(user.ID)
 	if err != nil {
-		return nil, "", "", err
+		log.Error().Err(err).Int64("user_id", user.ID).Msg("Failed to generate refresh token")
+		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
 	}
 
-	session := &entity.Session{
-		UserID:                user.ID,
-		RefreshToken:          refreshToken,
-		ExpiresAtRefreshToken: time.Now().Add(tokens.RefreshTokenTTL),
-	}
-
-	err = uc.sessionRepo.CreateSession(ctx, session)
+	err = u.tokenRepo.Save(ctx, refresh, user.ID)
 	if err != nil {
-		return nil, "", "", err
+		log.Error().Err(err).Int64("user_id", user.ID).Msg("Failed to save refresh token")
+		return nil, fmt.Errorf("failed to save refresh token: %w", err)
 	}
 
-	return user, accessToken, refreshToken, nil
+	log.Info().Int64("user_id", user.ID).Msg("User logged in successfully")
+	return &response.LoginResponse{User: *user, Tokens: response.Tokens{AccessToken: access, RefreshToken: refresh}}, nil
 }
 
-func (uc *AuthUseCase) RefreshToken(ctx context.Context, refreshToken string) (*entity.User, string, error) {
-	session, err := uc.sessionRepo.GetSessionByRefreshToken(ctx, refreshToken)
+func (u *authUsecase) Refresh(ctx context.Context, refreshToken string) (*response.RefreshResponse, error) {
+	log := u.log.With().Str("op", refreshOp).Logger()
+
+	claims, err := u.jwt.ParseToken(refreshToken)
 	if err != nil {
-		return nil, "", err
-	}
-	if session == nil {
-		return nil, "", errors.New("invalid refresh token")
+		log.Warn().Err(err).Msg("Failed to parse refresh token")
+		return nil, fmt.Errorf("invalid refresh token: %w", err)
 	}
 
-	if time.Now().After(session.ExpiresAtRefreshToken) {
-		return nil, "", errors.New("refresh token expired")
+	var refreshClaims entity.RefreshClaims
+	if err := mapstructure.Decode(claims, &refreshClaims); err != nil {
+		log.Error().Err(err).Msg("Failed to decode refresh token claims")
+		return nil, fmt.Errorf("failed to decode refresh token claims: %w", err)
 	}
 
-	user, err := uc.userRepo.GetUserByID(ctx, session.UserID)
+	userID, err := u.tokenRepo.GetUserID(ctx, refreshToken)
 	if err != nil {
-		return nil, "", err
-	}
-	if user == nil {
-		return nil, "", errors.New("user not found")
+		log.Warn().Err(err).Msg("Refresh token not found or DB error")
+		return nil, fmt.Errorf("refresh token not found or invalid: %w", err)
 	}
 
-	newRefreshToken, err := uc.tokenManager.GenerateRefreshToken()
+	if refreshClaims.UserID != userID {
+		log.Warn().Int64("user_id_claims", refreshClaims.UserID).Int64("user_id_db", userID).Msg("User ID mismatch in refresh token")
+		return nil, errors.New("user_id mismatch in refresh token")
+	}
+
+	if err := u.tokenRepo.Delete(ctx, refreshToken); err != nil {
+		log.Error().Err(err).Int64("user_id", userID).Msg("Failed to delete used refresh token from repository")
+		return nil, fmt.Errorf("failed to delete used refresh token: %w", err)
+	}
+
+	role, err := u.userRepo.GetRole(ctx, userID)
 	if err != nil {
-		return nil, "", err
+		log.Error().Err(err).Int64("user_id", userID).Msg("Failed to get user role for refresh")
+		return nil, fmt.Errorf("failed to get user role for refresh: %w", err)
 	}
 
-	session.RefreshToken = newRefreshToken
-	session.ExpiresAtRefreshToken = time.Now().Add(tokens.RefreshTokenTTL)
-
-	err = uc.sessionRepo.UpdateSession(ctx, session)
+	newAccess, err := u.jwt.GenerateAccessToken(userID, role)
 	if err != nil {
-		return nil, "", err
+		log.Error().Err(err).Int64("user_id", userID).Msg("Failed to generate new access token")
+		return nil, fmt.Errorf("failed to generate new access token: %w", err)
 	}
 
-	return user, newRefreshToken, nil
+	newRefresh, err := u.jwt.GenerateRefreshToken(userID)
+	if err != nil {
+		log.Error().Err(err).Int64("user_id", userID).Msg("Failed to generate new refresh token")
+		return nil, fmt.Errorf("failed to generate new refresh token: %w", err)
+	}
+
+	err = u.tokenRepo.Save(ctx, newRefresh, userID)
+	if err != nil {
+		log.Error().Err(err).Int64("user_id", userID).Msg("Failed to save new refresh token")
+		return nil, fmt.Errorf("failed to save new refresh token: %w", err)
+	}
+
+	log.Info().Str("op", refreshOp).Int64("user_id", userID).Msg("User refreshed successfully")
+	return &response.RefreshResponse{Tokens: response.Tokens{AccessToken: newAccess, RefreshToken: newRefresh}}, nil
 }
 
-func (uc *AuthUseCase) Logout(ctx context.Context, refreshToken string) error {
-	session, err := uc.sessionRepo.GetSessionByRefreshToken(ctx, refreshToken)
-	if err != nil {
+func (u *authUsecase) Logout(ctx context.Context, refreshToken string) error {
+	if err := u.tokenRepo.Delete(ctx, refreshToken); err != nil {
+		u.log.Warn().Err(err).Str("op", logoutOp).Msg("Failed to delete refresh token from repository")
 		return err
 	}
-	if session == nil {
-		return nil
-	}
 
-	return uc.sessionRepo.DeleteSession(ctx, session.ID)
+	u.log.Info().Str("op", logoutOp).Msg("User logged out successfully")
+	return nil
 }
 
-func (uc *AuthUseCase) GetUser(ctx context.Context, id int64) (*entity.User, error) {
-	return uc.userRepo.GetUserByID(ctx, id)
+func (u *authUsecase) IsSessionActive(ctx context.Context, refreshToken string) (*response.IsSessionActiveResponse, error) {
+	log := u.log.With().Str("op", isSessionActiveOp).Logger()
+
+	if refreshToken == "" {
+		return &response.IsSessionActiveResponse{User: nil, IsActive: false}, nil
+	}
+	id, err := u.tokenRepo.GetUserID(ctx, refreshToken)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return &response.IsSessionActiveResponse{User: nil, IsActive: false}, nil
+		}
+		log.Error().Err(err).Msg("Failed to check if session is active")
+		return nil, fmt.Errorf("failed to check if session is active: %w", err)
+	}
+
+	user, err := u.userRepo.GetByID(ctx, id)
+	if err != nil {
+		log.Error().Err(err).Int64("user_id", id).Msg("Failed to get user by ID")
+		return nil, fmt.Errorf("failed to get user by ID: %w", err)
+	}
+	log.Info().Str("username", user.Username).Str("role", user.Role).Msg("succesfully checked session")
+	return &response.IsSessionActiveResponse{User: user, IsActive: true}, nil
 }

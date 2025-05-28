@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
-	"net"
+	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -11,42 +11,37 @@ import (
 	"time"
 
 	"github.com/Van-programan/Forum_GO/config"
-	"github.com/Van-programan/Forum_GO/internal/controller"
+	"github.com/Van-programan/Forum_GO/internal/client"
+	"github.com/Van-programan/Forum_GO/internal/controller/route"
 	"github.com/Van-programan/Forum_GO/internal/repo"
-	"github.com/Van-programan/Forum_GO/internal/transport/ws"
 	"github.com/Van-programan/Forum_GO/internal/usecase"
+	"github.com/Van-programan/Forum_GO/internal/ws"
+	"github.com/Van-programan/Forum_GO/pkg/httpserver"
+	"github.com/Van-programan/Forum_GO/pkg/jwt"
 	"github.com/Van-programan/Forum_GO/pkg/logger"
 	"github.com/Van-programan/Forum_GO/pkg/migrator"
 	"github.com/Van-programan/Forum_GO/pkg/postgres"
-	"github.com/Van-programan/Forum_GO/pkg/proto/forumservice"
-	"github.com/Van-programan/Forum_GO/pkg/tokens"
-	"google.golang.org/grpc"
 )
 
 func RunForumService() {
-	logger := logger.New("info")
-	logger.Info("Starting forum service...")
 
 	cfg, err := config.NewConfigForum()
 	if err != nil {
-		logger.Fatal("Failed to load config", err)
+		log.Fatalf("Failed to load config", err)
 	}
 
-	cfgAuth, err := config.NewConfigAuth()
-	if err != nil {
-		logger.Fatal("Failed to load config", err)
-	}
+	logger := logger.New("forum-service", cfg.Log.LogLevel)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	pg := postgres.NewPostgresForum(ctx, cfg)
 	if pg == nil {
-		logger.Fatal("Failed to connect to database", nil)
+		log.Fatalf("Failed to connect to database")
 	}
 	defer pg.Close()
 
-	logger.Info("Successfully connected to database")
+	log.Fatalf("Successfully connected to database")
 
 	dbURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
 		cfg.PGForum.DBUser,
@@ -58,58 +53,36 @@ func RunForumService() {
 
 	migrationsPath := filepath.Join("migrations", "forum")
 
-	migrator := migrator.NewMigrator(dbURL, migrationsPath, logger)
+	migrator := migrator.NewMigrator(dbURL, migrationsPath, *logger)
 	defer migrator.Close()
 	migrator.Up()
 
-	messageRepo := repo.NewMessageRepository(pg)
-	topicRepo := repo.NewTopicRepository(pg)
+	categoryRepo := repo.NewCategoryRepository(pg, logger)
+	topicRepo := repo.NewTopicRepository(pg, logger)
+	postRepo := repo.NewPostRepository(pg, logger)
+	chatRepo := repo.NewChatRepository(pg, logger)
 
-	wsHub := ws.NewHub()
-	go wsHub.Run()
-
-	tokenManager := tokens.NewTokenManager(cfgAuth.JWT.JWTSecretKey)
-
-	forumUC := usecase.NewForumUseCase(topicRepo, messageRepo, wsHub, tokenManager)
-
-	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(loggingInterceptor(logger)),
-	)
-
-	forumController := controller.NewForumController(forumUC)
-	forumservice.RegisterForumServiceServer(grpcServer, forumController.UnimplementedForumServiceServer)
-
-	listener, err := net.Listen("tcp", net.JoinHostPort("", cfg.ForumInfo.GRPCPort))
+	userClient, err := client.New(cfg.ForumInfo.GRPCPort, logger)
 	if err != nil {
-		logger.Fatal("Failed to create listener", err)
+		log.Fatalf("app - Run - client.New: %v", err)
 	}
+	defer userClient.Close()
 
-	go func() {
-		logger.Info("Forum gRPC server started")
-		if err := grpcServer.Serve(listener); err != nil {
-			logger.Fatal("gRPC server failed", err)
-		}
-	}()
+	categoryUC := usecase.NewCategoryUsecase(categoryRepo, logger)
+	topicUC := usecase.NewTopicUsecase(topicRepo, categoryRepo, userClient, logger)
+	postUC := usecase.NewPostUsecase(postRepo, topicRepo, userClient, logger)
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	jwt := jwt.New(cfg.JWT.Secret, cfg.JWT.Access_TTL, cfg.JWT.Refresh_TTL)
 
-	logger.Info("Shutting down server...")
+	hub := ws.NewHub(logger)
+	go hub.Run()
+	chatUC := usecase.NewChatUsecase(chatRepo, logger)
 
-	stopped := make(chan struct{})
-	go func() {
-		grpcServer.GracefulStop()
-		close(stopped)
-	}()
+	httpServer := httpserver.New(cfg.ForumInfo.Server)
+	route.NewForumRouter(httpServer.Engine, categoryUC, topicUC, postUC, jwt, logger, hub, chatUC, userClient)
+	httpServer.Run()
 
-	select {
-	case <-time.After(5 * time.Second):
-		logger.Warn("Server shutdown timed out, forcing exit")
-		grpcServer.Stop()
-	case <-stopped:
-		logger.Info("Server stopped gracefully")
-	}
-
-	logger.Info("Server shutdown completed")
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
+	<-interrupt
 }

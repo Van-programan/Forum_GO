@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package auth;
+
+option go_package = "github.com/Van-programan/Forum_GO/proto;userpb";
+
+service UserService {
+    rpc GetUsernames (GetUsernamesRequest) returns (GetUsernamesResponse);
+    rpc GetUsername (GetUsernameRequest) returns (GetUsernameResponse);
+}
+
+message GetUsernamesRequest {
+    repeated int64 user_ids = 1;
+}
+
+message GetUsernamesResponse {
+    map<int64, string> usernames = 1;
+}
+
+message GetUsernameRequest {
+    int64 user_id = 1;
+}
+
+message GetUsernameResponse {
+    int64 user_id = 1;
+    string username = 2;
+}

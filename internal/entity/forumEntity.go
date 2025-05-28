@@ -2,17 +2,48 @@ package entity
 
 import "time"
 
-type Message struct {
-	ID        int64     `json:"id" db:"id"`
-	TopicID   int64     `json:"topic_id" db:"topic_id"`
-	UserID    int64     `json:"user_id" db:"user_id"`
-	Content   string    `json:"content" db:"content"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
+type ChatMessage struct {
+	ID        int64     `json:"id"`
+	UserID    int64     `json:"user_id"`
+	Username  string    `json:"username"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type Category struct {
+	ID          int64     `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type Post struct {
+	ID        int64     `json:"id"`
+	TopicID   int64     `json:"topic_id"`
+	AuthorID  *int64    `json:"author_id"`
+	Username  string    `json:"username"`
+	Content   string    `json:"content"`
+	ReplyTo   *int64    `json:"reply_to"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Topic struct {
-	ID        int64     `json:"id" db:"id"`
-	Title     string    `json:"title" db:"title"`
-	AuthorID  int64     `json:"author_id" db:"author_id"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	ID         int64     `json:"id"`
+	CategoryID int64     `json:"category_id"`
+	Title      string    `json:"title"`
+	AuthorID   *int64    `json:"author_id"`
+	Username   string    `json:"username"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+type WsMessage struct {
+	Type    string      `json:"type"`
+	Payload interface{} `json:"payload,omitempty"`
+}
+
+type IncomingWsMessage struct {
+	Content string `json:"content"`
 }

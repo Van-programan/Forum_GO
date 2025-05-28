@@ -2,237 +2,145 @@ package repo
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/Van-programan/Forum_GO/internal/entity"
 	"github.com/Van-programan/Forum_GO/pkg/postgres"
-	"github.com/jackc/pgx/v5"
+	"github.com/rs/zerolog"
 )
 
-type UserRepository interface {
-	CreateUser(ctx context.Context, user *entity.User) error
-	GetUsers(ctx context.Context) ([]entity.User, error)
-	GetUserByID(ctx context.Context, id int64) (*entity.User, error)
-	GetUserByEmail(ctx context.Context, email string) (*entity.User, error)
-	UpdateUser(ctx context.Context, user *entity.User) error
-	DeleteUser(ctx context.Context, id int64) error
+type (
+	UserRepository interface {
+		Create(ctx context.Context, user *entity.User) (int64, error)
+		Delete(ctx context.Context, id int64) error
+		GetByUsername(ctx context.Context, username string) (*entity.User, error)
+		GetByID(ctx context.Context, id int64) (*entity.User, error)
+		GetRole(ctx context.Context, id int64) (string, error)
+	}
+
+	RefreshTokenRepository interface {
+		Save(ctx context.Context, token string, userID int64) error
+		Delete(ctx context.Context, token string) error
+		GetUserID(ctx context.Context, token string) (int64, error)
+	}
+)
+
+const (
+	createOp        = "UserRepository.Create"
+	deleteOp        = "UserRepository.Delete"
+	getByUsernameOp = "UserRepository.GetByUsername"
+	getByIDOp       = "UserRepository.GetByID"
+	getRoleOp       = "UserRepository.GetRole"
+)
+
+const (
+	saveOp        = "RefreshTokenRepository.Save"
+	deleteTokenOp = "RefreshTokenRepository.Delete"
+	getUserIDOp   = "RefreshTokenRepository.GetUserID"
+	isActiveOp    = "RefreshTokenRepository.IsActive"
+)
+
+type userRepository struct {
+	pg  *postgres.Postgres
+	log *zerolog.Logger
 }
-type SessionRepository interface {
-	CreateSession(ctx context.Context, session *entity.Session) error
-	GetSessionByRefreshToken(ctx context.Context, token string) (*entity.Session, error)
-	UpdateSession(ctx context.Context, session *entity.Session) error
-	DeleteSession(ctx context.Context, id int64) error
+
+type refreshTokenRepository struct {
+	pg  *postgres.Postgres
+	log *zerolog.Logger
 }
 
-type sessionRepo struct {
-	pg *postgres.Postgres
+func NewUserRepository(pg *postgres.Postgres, log *zerolog.Logger) UserRepository {
+	return &userRepository{pg, log}
 }
 
-type userRepo struct {
-	pg *postgres.Postgres
+func NewRefreshTokenRepository(pg *postgres.Postgres, log *zerolog.Logger) RefreshTokenRepository {
+	return &refreshTokenRepository{pg, log}
 }
 
-func NewUserRepository(pg *postgres.Postgres) UserRepository {
-	return &userRepo{pg: pg}
+func (r *userRepository) Create(ctx context.Context, user *entity.User) (int64, error) {
+	row := r.pg.Pool.QueryRow(ctx,
+		"INSERT INTO users (username, password_hash) VALUES($1, $2) RETURNING id",
+		user.Username, string(user.PasswordHash))
+
+	var id int64
+	if err := row.Scan(&id); err != nil {
+		r.log.Error().Err(err).Str("op", createOp).Str("username", user.Username).Msg("Failed to scan user ID after insert")
+		return 0, fmt.Errorf("UserRepository - Create - row.Scan(): %w", err)
+	}
+
+	return id, nil
 }
 
-func NewSessionRepository(pg *postgres.Postgres) SessionRepository {
-	return &sessionRepo{pg: pg}
-}
-
-func (r *userRepo) CreateUser(ctx context.Context, user *entity.User) error {
-	query := `
-		INSERT INTO users (username, email, password_hash, registered_at)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id`
-
-	err := r.pg.Pool.QueryRow(ctx, query,
-		user.Username,
-		user.Email,
-		user.Password,
-		user.RegisteredAt,
-	).Scan(&user.ID)
-
-	if err != nil {
-		return fmt.Errorf("authRepo.CreateUser: %w", err)
+func (r *userRepository) Delete(ctx context.Context, id int64) error {
+	if _, err := r.pg.Pool.Exec(ctx, "DELETE FROM users WHERE id = $1", id); err != nil {
+		r.log.Error().Err(err).Str("op", deleteOp).Int64("id", id).Msg("Failed to delete user")
+		return fmt.Errorf("UserRepository - Delete - pg.Pool.Exec(): %w", err)
 	}
 	return nil
 }
 
-func (r *userRepo) GetUsers(ctx context.Context) ([]entity.User, error) {
-	query := `
-        SELECT id, username, email, registered_at
-        FROM users
-        ORDER BY id`
+func (r *userRepository) GetByUsername(ctx context.Context, username string) (*entity.User, error) {
+	row := r.pg.Pool.QueryRow(ctx, "SELECT id, username, role, password_hash, created_at FROM users WHERE username = $1", username)
 
-	rows, err := r.pg.Pool.Query(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("authRepo.GetUsers: %w", err)
-	}
-	defer rows.Close()
-
-	var users []entity.User
-	for rows.Next() {
-		var user entity.User
-		if err := rows.Scan(
-			&user.ID,
-			&user.Username,
-			&user.Email,
-			&user.RegisteredAt,
-		); err != nil {
-			return nil, fmt.Errorf("authRepo.GetUsers: %w", err)
-		}
-		users = append(users, user)
+	var u entity.User
+	if err := row.Scan(&u.ID, &u.Username, &u.Role, &u.PasswordHash, &u.CreatedAt); err != nil {
+		r.log.Error().Err(err).Str("op", getByUsernameOp).Str("username", username).Msg("Failed to scan user")
+		return nil, fmt.Errorf("UserRepository - GetByUsername - row.Scan(): %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("authRepo.GetUsers: %w", err)
-	}
-
-	return users, nil
+	return &u, nil
 }
 
-func (r *userRepo) GetUserByEmail(ctx context.Context, email string) (*entity.User, error) {
-	query := `
-		SELECT id, username, email, password_hash, registered_at
-		FROM users
-		WHERE email = $1`
+func (r *userRepository) GetByID(ctx context.Context, id int64) (*entity.User, error) {
+	row := r.pg.Pool.QueryRow(ctx, "SELECT id, username, role, created_at FROM users WHERE id = $1", id)
 
-	var user entity.User
-	err := r.pg.Pool.QueryRow(ctx, query, email).Scan(
-		&user.ID,
-		&user.Username,
-		&user.Email,
-		&user.Password,
-		&user.RegisteredAt,
-	)
+	var u entity.User
+	if err := row.Scan(&u.ID, &u.Username, &u.Role, &u.CreatedAt); err != nil {
+		r.log.Error().Err(err).Str("op", getByIDOp).Int64("id", id).Msg("Failed to scan user")
+		return nil, fmt.Errorf("UserRepository - GetByID - row.Scan(): %w", err)
+	}
 
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("authRepo.GetUserByEmail: %w", err)
-	}
-	return &user, nil
+	return &u, nil
 }
 
-func (r *userRepo) GetUserByID(ctx context.Context, id int64) (*entity.User, error) {
-	query := `
-		SELECT id, username, email, password_hash, registered_at
-		FROM users
-		WHERE id = $1`
+func (r *userRepository) GetRole(ctx context.Context, id int64) (string, error) {
+	row := r.pg.Pool.QueryRow(ctx, "SELECT role FROM users WHERE id = $1", id)
 
-	var user entity.User
-	err := r.pg.Pool.QueryRow(ctx, query, id).Scan(
-		&user.ID,
-		&user.Username,
-		&user.Email,
-		&user.Password,
-		&user.RegisteredAt,
-	)
+	var role string
+	if err := row.Scan(&role); err != nil {
+		r.log.Error().Err(err).Str("op", getRoleOp).Int64("id", id).Msg("Failed to get role")
+		return "", fmt.Errorf("UserRepository - GetRole - row.Scan(): %w", err)
+	}
 
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("authRepo.GetUserByEmail: %w", err)
-	}
-	return &user, nil
+	return role, nil
 }
 
-func (r *userRepo) UpdateUser(ctx context.Context, user *entity.User) error {
-	query := `
-		UPDATE users
-		SET username = $1, email = $2, password_hash = $3
-		WHERE id = $4`
+func (r *refreshTokenRepository) Save(ctx context.Context, token string, userID int64) error {
+	if _, err := r.pg.Pool.Exec(ctx, "INSERT INTO refresh_tokens (token, user_id) VALUES($1, $2)", token, userID); err != nil {
+		r.log.Error().Err(err).Str("op", saveOp).Str("token", token).Int64("userID", userID).Msg("Failed to save refresh token")
+		return fmt.Errorf("RefreshTokenRepository - Save - pg.Pool.Exec(): %w", err)
+	}
+	r.pg.Pool.Config()
+	return nil
+}
 
-	_, err := r.pg.Pool.Exec(ctx, query,
-		user.Username,
-		user.Email,
-		user.Password,
-		user.ID,
-	)
-
-	if err != nil {
-		return fmt.Errorf("authRepo.UpdateUser: %w", err)
+func (r *refreshTokenRepository) Delete(ctx context.Context, token string) error {
+	if _, err := r.pg.Pool.Exec(ctx, `DELETE FROM refresh_tokens WHERE token = $1`, token); err != nil {
+		r.log.Error().Err(err).Str("op", deleteTokenOp).Str("token", token).Msg("Failed to delete refresh token")
+		return fmt.Errorf("RefreshTokenRepository - Delete - pg.Pool.Exec(): %w", err)
 	}
 	return nil
 }
 
-func (r *userRepo) DeleteUser(ctx context.Context, id int64) error {
-	query := `DELETE FROM users WHERE id = $1`
-	_, err := r.pg.Pool.Exec(ctx, query, id)
-	if err != nil {
-		return fmt.Errorf("authRepo.DeleteUser: %w", err)
+func (r *refreshTokenRepository) GetUserID(ctx context.Context, token string) (int64, error) {
+	row := r.pg.Pool.QueryRow(ctx, "SELECT user_id FROM refresh_tokens WHERE token = $1", token)
+
+	var id int64
+	if err := row.Scan(&id); err != nil {
+		r.log.Error().Err(err).Str("op", getUserIDOp).Str("token", token).Msg("Failed to get user ID")
+		return 0, fmt.Errorf("RefreshTokenRepository - GetByUserID - row.Scan(): %w", err)
 	}
-	return nil
-}
 
-func (r *sessionRepo) CreateSession(ctx context.Context, session *entity.Session) error {
-	query := `
-		INSERT INTO sessions (
-			user_id, refresh_token, refresh_token_expires_at
-		) VALUES ($1, $2, $3)
-		RETURNING id`
-
-	err := r.pg.Pool.QueryRow(ctx, query,
-		session.UserID,
-		session.RefreshToken,
-		session.ExpiresAtRefreshToken,
-	).Scan(&session.ID)
-
-	if err != nil {
-		return fmt.Errorf("sessionRepo.CreateSession: %w", err)
-	}
-	return nil
-}
-
-func (r *sessionRepo) GetSessionByRefreshToken(ctx context.Context, token string) (*entity.Session, error) {
-	query := `
-		SELECT id, user_id, refresh_token, refresh_token_expires_at
-		FROM sessions
-		WHERE refresh_token = $1`
-
-	var session entity.Session
-	err := r.pg.Pool.QueryRow(ctx, query, token).Scan(
-		&session.ID,
-		&session.UserID,
-		&session.RefreshToken,
-		&session.ExpiresAtRefreshToken,
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("sessionRepo.GetSessionByRefreshToken: %w", err)
-	}
-	return &session, nil
-}
-
-func (r *sessionRepo) UpdateSession(ctx context.Context, session *entity.Session) error {
-	query := `
-        UPDATE sessions 
-        SET 
-            refresh_token = $1,
-            refresh_token_expires_at = $2
-        WHERE id = $3`
-
-	_, err := r.pg.Pool.Exec(ctx, query,
-		session.RefreshToken,
-		session.ExpiresAtRefreshToken,
-		session.ID,
-	)
-
-	if err != nil {
-		return fmt.Errorf("sessionRepo.UpdateSession: %w", err)
-	}
-	return nil
-}
-
-func (r *sessionRepo) DeleteSession(ctx context.Context, id int64) error {
-	query := `DELETE FROM sessions WHERE id = $1`
-	_, err := r.pg.Pool.Exec(ctx, query, id)
-	if err != nil {
-		return fmt.Errorf("sessionRepo.DeleteSession: %w", err)
-	}
-	return nil
+	return id, nil
 }
