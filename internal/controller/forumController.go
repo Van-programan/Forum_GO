@@ -74,10 +74,10 @@ func NewChatHandler(hub *ws.Hub, chatUsecase usecase.ChatUsecase, userClient cli
 // @Produce json
 // @Param category body entity.Category true "Category data to create. ID, CreatedAt, UpdatedAt will be ignored."
 // @Success 201 {object} response.IDResponse "Category created successfully"
-// @Failure 400 {object} response.ErrorResponse "Invalid request payload"
-// @Failure 401 {object} response.ErrorResponse "Unauthorized (token is missing or invalid)"
-// @Failure 403 {object} response.ErrorResponse "Forbidden (user is not an admin)"
-// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Failure 400 {object} response.ErrorResponseForum "Invalid request payload"
+// @Failure 401 {object} response.ErrorResponseForum "Unauthorized (token is missing or invalid)"
+// @Failure 403 {object} response.ErrorResponseForum "Forbidden (user is not an admin)"
+// @Failure 500 {object} response.ErrorResponseForum "Internal server error"
 // @Security ApiKeyAuth
 // @Router /categories [post]
 func (h *CategoryHandler) Create(c *gin.Context) {
@@ -107,8 +107,8 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Category ID" Format(int64)
 // @Success 200 {object} response.CategoryResponse "Successfully retrieved category"
-// @Failure 400 {object} response.ErrorResponse "Invalid category ID"
-// @Failure 500 {object} response.ErrorResponse "Failed to get category"
+// @Failure 400 {object} response.ErrorResponseForum "Invalid category ID"
+// @Failure 500 {object} response.ErrorResponseForum "Failed to get category"
 // @Router /categories/{id} [get]
 func (h *CategoryHandler) GetByID(c *gin.Context) {
 	log := h.getRequestLogger(c).With().Str("op", getTitleOp).Logger()
@@ -137,7 +137,7 @@ func (h *CategoryHandler) GetByID(c *gin.Context) {
 // @Tags categories
 // @Produce json
 // @Success 200 {object} response.CategoriesResponse "Successfully retrieved all categories"
-// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Failure 500 {object} response.ErrorResponseForum "Internal server error"
 // @Router /categories [get]
 func (h *CategoryHandler) GetAll(c *gin.Context) {
 	log := h.getRequestLogger(c).With().Str("op", getAllOp).Logger()
@@ -158,10 +158,10 @@ func (h *CategoryHandler) GetAll(c *gin.Context) {
 // @Tags categories
 // @Param id path int true "Category ID" Format(int64)
 // @Success 200 "Category deleted successfully"
-// @Failure 400 {object} response.ErrorResponse "Invalid category ID"
-// @Failure 401 {object} response.ErrorResponse "Unauthorized (token is missing or invalid)"
-// @Failure 403 {object} response.ErrorResponse "Forbidden (user is not an admin)"
-// @Failure 500 {object} response.ErrorResponse "Failed to delete category"
+// @Failure 400 {object} response.ErrorResponseForum "Invalid category ID"
+// @Failure 401 {object} response.ErrorResponseForum "Unauthorized (token is missing or invalid)"
+// @Failure 403 {object} response.ErrorResponseForum "Forbidden (user is not an admin)"
+// @Failure 500 {object} response.ErrorResponseForum "Failed to delete category"
 // @Security ApiKeyAuth
 // @Router /categories/{id} [delete]
 func (h *CategoryHandler) Delete(c *gin.Context) {
@@ -190,12 +190,12 @@ func (h *CategoryHandler) Delete(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Category ID" Format(int64)
-// @Param category_update body categoryrequests.UpdateRequest true "Category update data"
+// @Param category_update body request.UpdateRequestCategory true "Category update data"
 // @Success 200 "Category updated successfully"
-// @Failure 400 {object} response.ErrorResponse "Invalid category ID or request payload"
-// @Failure 401 {object} response.ErrorResponse "Unauthorized (token is missing or invalid)"
-// @Failure 403 {object} response.ErrorResponse "Forbidden (user is not an admin)"
-// @Failure 500 {object} response.ErrorResponse "Failed to update category"
+// @Failure 400 {object} response.ErrorResponseForum "Invalid category ID or request payload"
+// @Failure 401 {object} response.ErrorResponseForum "Unauthorized (token is missing or invalid)"
+// @Failure 403 {object} response.ErrorResponseForum "Forbidden (user is not an admin)"
+// @Failure 500 {object} response.ErrorResponseForum "Failed to update category"
 // @Security ApiKeyAuth
 // @Router /categories/{id} [patch]
 func (h *CategoryHandler) Update(c *gin.Context) {
@@ -308,9 +308,9 @@ func (h *PostHandler) Create(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Topic ID" Format(int64)
 // @Success 200 {object} response.PostsResponse "Successfully retrieved posts"
-// @Failure 400 {object} response.ErrorResponse "Invalid topic ID"
-// @Failure 404 {object} response.ErrorResponse "Topic not found"
-// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Failure 400 {object} response.ErrorResponseForum "Invalid topic ID"
+// @Failure 404 {object} response.ErrorResponseForum "Topic not found"
+// @Failure 500 {object} response.ErrorResponseForum "Internal server error"
 // @Router /topics/{id}/posts [get]
 func (h *PostHandler) GetByTopic(c *gin.Context) {
 	topicID, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -339,13 +339,13 @@ func (h *PostHandler) GetByTopic(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Post ID" Format(int64)
-// @Param post_update body postrequests.UpdateRequest true "Post update data (only content)"
+// @Param post_update body request.UpdateRequestPost true "Post update data (only content)"
 // @Success 200 {object} response.SuccessMessageResponse "Post updated successfully"
-// @Failure 400 {object} response.ErrorResponse "Invalid post ID or request payload"
-// @Failure 401 {object} response.ErrorResponse "Unauthorized (token is missing or invalid)"
-// @Failure 403 {object} response.ErrorResponse "Forbidden (user is not an owner or admin)"
-// @Failure 404 {object} response.ErrorResponse "Post not found"
-// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Failure 400 {object} response.ErrorResponseForum "Invalid post ID or request payload"
+// @Failure 401 {object} response.ErrorResponseForum "Unauthorized (token is missing or invalid)"
+// @Failure 403 {object} response.ErrorResponseForum "Forbidden (user is not an owner or admin)"
+// @Failure 404 {object} response.ErrorResponseForum "Post not found"
+// @Failure 500 {object} response.ErrorResponseForum "Internal server error"
 // @Security ApiKeyAuth
 // @Router /posts/{id} [patch]
 func (h *PostHandler) Update(c *gin.Context) {
@@ -392,11 +392,11 @@ func (h *PostHandler) Update(c *gin.Context) {
 // @Tags posts
 // @Param id path int true "Post ID" Format(int64)
 // @Success 200 {object} response.SuccessMessageResponse "Post deleted successfully"
-// @Failure 400 {object} response.ErrorResponse "Invalid post ID"
-// @Failure 401 {object} response.ErrorResponse "Unauthorized (token is missing or invalid)"
-// @Failure 403 {object} response.ErrorResponse "Forbidden (user is not an owner or admin)"
-// @Failure 404 {object} response.ErrorResponse "Post not found"
-// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Failure 400 {object} response.ErrorResponseForum "Invalid post ID"
+// @Failure 401 {object} response.ErrorResponseForum "Unauthorized (token is missing or invalid)"
+// @Failure 403 {object} response.ErrorResponseForum "Forbidden (user is not an owner or admin)"
+// @Failure 404 {object} response.ErrorResponseForum "Post not found"
+// @Failure 500 {object} response.ErrorResponseForum "Internal server error"
 // @Security ApiKeyAuth
 // @Router /posts/{id} [delete]
 func (h *PostHandler) Delete(c *gin.Context) {
@@ -439,10 +439,10 @@ func (h *PostHandler) Delete(c *gin.Context) {
 // @Param id path int true "Category ID to create topic in" Format(int64)
 // @Param topic body entity.Topic true "Topic data to create. ID, AuthorID, CategoryID, CreatedAt, UpdatedAt will be ignored or overridden."
 // @Success 200 {object} response.IDResponse "Topic created successfully"
-// @Failure 400 {object} response.ErrorResponse "Invalid category ID or request payload"
-// @Failure 401 {object} response.ErrorResponse "Unauthorized (token is missing or invalid)"
-// @Failure 403 {object} response.ErrorResponse "Forbidden (user is not authorized or trying to impersonate)"
-// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Failure 400 {object} response.ErrorResponseForum "Invalid category ID or request payload"
+// @Failure 401 {object} response.ErrorResponseForum "Unauthorized (token is missing or invalid)"
+// @Failure 403 {object} response.ErrorResponseForum "Forbidden (user is not authorized or trying to impersonate)"
+// @Failure 500 {object} response.ErrorResponseForum "Internal server error"
 // @Security ApiKeyAuth
 // @Router /categories/{id}/topics [post]
 func (h *TopicHandler) Create(c *gin.Context) {
@@ -495,8 +495,8 @@ func (h *TopicHandler) Create(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Topic ID" Format(int64)
 // @Success 200 {object} response.TopicResponse "Successfully retrieved topic"
-// @Failure 400 {object} response.ErrorResponse "Invalid topic ID"
-// @Failure 500 {object} response.ErrorResponse "Failed to get topic"
+// @Failure 400 {object} response.ErrorResponseForum "Invalid topic ID"
+// @Failure 500 {object} response.ErrorResponseForum "Failed to get topic"
 // @Router /topics/{id} [get]
 func (h *TopicHandler) GetByID(c *gin.Context) {
 	log := h.getRequestLogger(c).With().Str("op", getByIDTopicOP).Logger()
@@ -526,9 +526,9 @@ func (h *TopicHandler) GetByID(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Category ID" Format(int64)
 // @Success 200 {object} response.TopicsResponse "Successfully retrieved topics"
-// @Failure 400 {object} response.ErrorResponse "Invalid category ID"
-// @Failure 404 {object} response.ErrorResponse "Category not found"
-// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Failure 400 {object} response.ErrorResponseForum "Invalid category ID"
+// @Failure 404 {object} response.ErrorResponseForum "Category not found"
+// @Failure 500 {object} response.ErrorResponseForum "Internal server error"
 // @Router /categories/{id}/topics [get]
 func (h *TopicHandler) GetByCategory(c *gin.Context) {
 	log := h.getRequestLogger(c).With().Str("op", getByCategoryOp).Logger()
@@ -563,13 +563,13 @@ func (h *TopicHandler) GetByCategory(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Topic ID" Format(int64)
-// @Param topic_update body topicrequests.UpdateRequest true "Topic update data (only title)"
+// @Param topic_update body request.UpdateRequestTopic true "Topic update data (only title)"
 // @Success 200 {object} response.SuccessMessageResponse "Topic updated successfully"
-// @Failure 400 {object} response.ErrorResponse "Invalid topic ID or request payload"
-// @Failure 401 {object} response.ErrorResponse "Unauthorized (token is missing or invalid)"
-// @Failure 403 {object} response.ErrorResponse "Forbidden (user is not an owner or admin)"
-// @Failure 404 {object} response.ErrorResponse "Topic not found"
-// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Failure 400 {object} response.ErrorResponseForum "Invalid topic ID or request payload"
+// @Failure 401 {object} response.ErrorResponseForum "Unauthorized (token is missing or invalid)"
+// @Failure 403 {object} response.ErrorResponseForum "Forbidden (user is not an owner or admin)"
+// @Failure 404 {object} response.ErrorResponseForum "Topic not found"
+// @Failure 500 {object} response.ErrorResponseForum "Internal server error"
 // @Security ApiKeyAuth
 // @Router /topics/{id} [patch]
 func (h *TopicHandler) Update(c *gin.Context) {
@@ -622,11 +622,11 @@ func (h *TopicHandler) Update(c *gin.Context) {
 // @Tags topics
 // @Param id path int true "Topic ID" Format(int64)
 // @Success 200 {object} response.SuccessMessageResponse "Topic deleted successfully"
-// @Failure 400 {object} response.ErrorResponse "Invalid topic ID"
-// @Failure 401 {object} response.ErrorResponse "Unauthorized (token is missing or invalid)"
-// @Failure 403 {object} response.ErrorResponse "Forbidden (user is not an owner or admin)"
-// @Failure 404 {object} response.ErrorResponse "Topic not found"
-// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Failure 400 {object} response.ErrorResponseForum "Invalid topic ID"
+// @Failure 401 {object} response.ErrorResponseForum "Unauthorized (token is missing or invalid)"
+// @Failure 403 {object} response.ErrorResponseForum "Forbidden (user is not an owner or admin)"
+// @Failure 404 {object} response.ErrorResponseForum "Topic not found"
+// @Failure 500 {object} response.ErrorResponseForum "Internal server error"
 // @Security ApiKeyAuth
 // @Router /topics/{id} [delete]
 func (h *TopicHandler) Delete(c *gin.Context) {

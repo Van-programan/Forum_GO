@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/Van-programan/Forum_GO/internal/controller/request"
+	_ "github.com/Van-programan/Forum_GO/internal/controller/response"
+	_ "github.com/Van-programan/Forum_GO/internal/entity"
 	"github.com/Van-programan/Forum_GO/internal/usecase"
 	"github.com/gin-gonic/gin"
 
@@ -30,10 +32,10 @@ const (
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param user body authrequest.RegisterRequest true "User Credentials"
-// @Success 200 {object} authresponse.RegisterSuccessResponse "Successfully registered"
-// @Failure 400 {object} authresponse.ErrorResponse "Invalid request payload"
-// @Failure 500 {object} authresponse.ErrorResponse "Internal server error"
+// @Param user body request.RegisterRequest true "User Credentials"
+// @Success 200 {object} response.RegisterSuccessResponse "Successfully registered"
+// @Failure 400 {object} response.ErrorResponseAuth "Invalid request payload"
+// @Failure 500 {object} response.ErrorResponseAuth "Internal server error"
 // @Router /register [post]
 func (ah *AuthHandler) Register(c *gin.Context) {
 	log := ah.getRequestLogger(c).With().Str("op", registerOp).Logger()
@@ -63,10 +65,10 @@ func (ah *AuthHandler) Register(c *gin.Context) {
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param credentials body authrequest.LoginRequest true "User Login Credentials"
-// @Success 200 {object} authresponse.LoginSuccessResponse "Successfully logged in"
-// @Failure 400 {object} authresponse.ErrorResponse "Invalid request payload"
-// @Failure 401 {object} authresponse.ErrorResponse "Invalid credentials"
+// @Param credentials body request.LoginRequest true "User Login Credentials"
+// @Success 200 {object} response.LoginSuccessResponse "Successfully logged in"
+// @Failure 400 {object} response.ErrorResponseAuth "Invalid request payload"
+// @Failure 401 {object} response.ErrorResponseAuth "Invalid credentials"
 // @Router /login [post]
 func (ah *AuthHandler) Login(c *gin.Context) {
 	log := ah.getRequestLogger(c).With().Str("op", loginOp).Logger()
@@ -106,8 +108,8 @@ func (ah *AuthHandler) Login(c *gin.Context) {
 // @Description Uses a refresh token to generate a new access token and a new refresh token. Refresh token is set as an HTTP-only cookie.
 // @Tags auth
 // @Produce json
-// @Success 200 {object} authresponse.RefreshSuccessResponse "Successfully refreshed tokens"
-// @Failure 401 {object} authresponse.ErrorResponse "Refresh token required or invalid/expired refresh token"
+// @Success 200 {object} response.RefreshSuccessResponse "Successfully refreshed tokens"
+// @Failure 401 {object} response.ErrorResponseAuth "Refresh token required or invalid/expired refresh token"
 // @Router /refresh [post]
 func (ah *AuthHandler) Refresh(c *gin.Context) {
 	log := ah.getRequestLogger(c).With().Str("op", refreshOp).Logger()
@@ -136,7 +138,7 @@ func (ah *AuthHandler) Refresh(c *gin.Context) {
 // @Description Logs out a user by deleting the refresh token from the server and clearing the refresh token cookie.
 // @Tags auth
 // @Produce json
-// @Success 200 {object} authresponse.LogoutSuccessResponse "Successfully logged out"
+// @Success 200 {object} response.LogoutSuccessResponse "Successfully logged out"
 // @Router /logout [post]
 func (ah *AuthHandler) Logout(c *gin.Context) {
 	log := ah.getRequestLogger(c).With().Str("op", logoutOp).Logger()

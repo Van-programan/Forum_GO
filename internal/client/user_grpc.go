@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	userpb "github.com/Van-programan/Forum_GO/pkg/proto"
@@ -24,30 +25,33 @@ type userClient struct {
 }
 
 func New(address string, log *zerolog.Logger) (UserClient, error) {
-	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
-	if err != nil {
-		return nil, err
+	if !strings.Contains(address, ":") {
+		address = ":" + address
 	}
 
+	conn, err := grpc.Dial(
+		address,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+		grpc.WithTimeout(5*time.Second),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("client.UserClient - New - grpc.NewClient: %w", err)
+		return nil, fmt.Errorf("grpc.Dial failed: %w", err)
 	}
 
-	c := userpb.NewUserServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	client := userpb.NewUserServiceClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	_, err = c.GetUsernames(ctx, &userpb.GetUsernamesRequest{
-		UserIds: []int64{},
-	})
-
+	_, err = client.GetUsernames(ctx, &userpb.GetUsernamesRequest{UserIds: []int64{0}})
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("client.UserClient - New - connection warmup failed: %w", err)
+		return nil, fmt.Errorf("health check failed: %w", err)
 	}
 
 	return &userClient{
-		client: c,
+		client: client,
 		conn:   conn,
 		log:    log,
 	}, nil

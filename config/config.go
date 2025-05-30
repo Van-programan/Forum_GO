@@ -33,12 +33,12 @@ type (
 	}
 
 	AuthInfo struct {
-		Server   string `env:"AUTH_SERVICE" envDefault:"3100"`
+		Server   string `env:"AUTH_SERVICE" envDefault:":3100"`
 		GRPCPort string `env:"GRPC_PORT" envDefault:"50051"`
 	}
 
 	ForumInfo struct {
-		Server   string `env:"FORUM_SERVICE" envDefault:"3101"`
+		Server   string `env:"FORUM_SERVICE" envDefault:":3101"`
 		GRPCPort string `env:"GRPC_PORT" envDefault:"50051"`
 	}
 
@@ -71,7 +71,7 @@ type (
 	}
 
 	Swagger struct {
-		Enabled bool `env:"SWAGGER_ENABLED" envDefault:"false"`
+		Enabled bool `env:"SWAGGER_ENABLED" envDefault:"true"`
 	}
 )
 

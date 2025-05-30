@@ -47,21 +47,20 @@ func RunAuthServer() {
 	}
 	defer pg.Close()
 
-	log.Fatalf("Successfully connected to database")
+	log.Println("Successfully connected to database")
 
 	migrationsPath := "migrations/auth"
 
 	migrator := migrator.NewMigrator(dbURL, migrationsPath, *logger)
 	defer migrator.Close()
 	migrator.Up()
-
 	userRepo := repo.NewUserRepository(pg, logger)
 	tokenRepo := repo.NewRefreshTokenRepository(pg, logger)
 
 	jwt := jwt.New(cfg.JWT.Secret, cfg.JWT.Access_TTL, cfg.JWT.Refresh_TTL)
 
 	authUC := usecase.NewAuthUsecase(userRepo, tokenRepo, jwt, logger)
-
+	fmt.Println("04")
 	httpServer := httpserver.New(cfg.AuthInfo.Server)
 	route.NewAuthRouter(httpServer.Engine, authUC, jwt, logger)
 

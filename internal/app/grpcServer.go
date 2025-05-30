@@ -52,10 +52,12 @@ func RunGrpcServer() {
 	grpcServer := Grpc.NewServer()
 	grpc.Register(grpcServer, userUsecase, logger)
 
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.AuthInfo.GRPCPort))
+	l, err := net.Listen("tcp", ":"+cfg.AuthInfo.GRPCPort)
 	if err != nil {
 		log.Fatalf("app - Run - net.Listen: %v", err)
 	}
+
+	fmt.Println("grpc run")
 
 	go func() {
 		if err := grpcServer.Serve(l); err != nil {

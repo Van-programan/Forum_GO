@@ -1,0 +1,758 @@
+basePath: /
+definitions:
+  entity.Category:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  entity.Post:
+    properties:
+      author_id:
+        type: integer
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      reply_to:
+        type: integer
+      topic_id:
+        type: integer
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  entity.Topic:
+    properties:
+      author_id:
+        type: integer
+      category_id:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  entity.User:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      role:
+        type: string
+      username:
+        type: string
+    type: object
+  request.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  request.RegisterRequest:
+    properties:
+      password:
+        type: string
+      role:
+        type: string
+      username:
+        type: string
+    type: object
+  request.UpdateRequestCategory:
+    properties:
+      description:
+        type: string
+      title:
+        type: string
+    type: object
+  request.UpdateRequestPost:
+    properties:
+      content:
+        type: string
+    type: object
+  request.UpdateRequestTopic:
+    properties:
+      title:
+        type: string
+    type: object
+  response.CategoriesResponse:
+    properties:
+      categories:
+        items:
+          $ref: '#/definitions/entity.Category'
+        type: array
+    type: object
+  response.CategoryResponse:
+    properties:
+      category:
+        $ref: '#/definitions/entity.Category'
+    type: object
+  response.ErrorResponseAuth:
+    properties:
+      error:
+        example: error message
+        type: string
+    type: object
+  response.ErrorResponseForum:
+    properties:
+      error:
+        example: error message
+        type: string
+    type: object
+  response.IDResponse:
+    properties:
+      id:
+        example: 123
+        type: integer
+    type: object
+  response.LoginSuccessResponse:
+    properties:
+      access_token:
+        type: string
+      user:
+        $ref: '#/definitions/entity.User'
+    type: object
+  response.LogoutSuccessResponse:
+    properties:
+      message:
+        example: logged out successfully
+        type: string
+    type: object
+  response.PostsResponse:
+    properties:
+      posts:
+        items:
+          $ref: '#/definitions/entity.Post'
+        type: array
+    type: object
+  response.RefreshSuccessResponse:
+    properties:
+      access_token:
+        type: string
+    type: object
+  response.RegisterSuccessResponse:
+    properties:
+      access_token:
+        type: string
+      user:
+        $ref: '#/definitions/entity.User'
+    type: object
+  response.SuccessMessageResponse:
+    properties:
+      message:
+        example: operation was successful
+        type: string
+    type: object
+  response.TopicResponse:
+    properties:
+      topic:
+        $ref: '#/definitions/entity.Topic'
+    type: object
+  response.TopicsResponse:
+    properties:
+      topics:
+        items:
+          $ref: '#/definitions/entity.Topic'
+        type: array
+    type: object
+host: localhost:3100
+info:
+  contact: {}
+  description: API for auth service
+  title: Auth Service API
+  version: "1.0"
+paths:
+  /categories:
+    get:
+      description: Retrieves a list of all categories.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved all categories
+          schema:
+            $ref: '#/definitions/response.CategoriesResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+      summary: Get all categories
+      tags:
+      - categories
+    post:
+      consumes:
+      - application/json
+      description: Creates a new category. Requires admin role.
+      parameters:
+      - description: Category data to create. ID, CreatedAt, UpdatedAt will be ignored.
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/entity.Category'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Category created successfully
+          schema:
+            $ref: '#/definitions/response.IDResponse'
+        "400":
+          description: Invalid request payload
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "401":
+          description: Unauthorized (token is missing or invalid)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "403":
+          description: Forbidden (user is not an admin)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new category
+      tags:
+      - categories
+  /categories/{id}:
+    delete:
+      description: Deletes a category by its ID. Requires admin privileges.
+      parameters:
+      - description: Category ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: Category deleted successfully
+        "400":
+          description: Invalid category ID
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "401":
+          description: Unauthorized (token is missing or invalid)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "403":
+          description: Forbidden (user is not an admin)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "500":
+          description: Failed to delete category
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a category
+      tags:
+      - categories
+    get:
+      description: Retrieves a specific category by its ID.
+      parameters:
+      - description: Category ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved category
+          schema:
+            $ref: '#/definitions/response.CategoryResponse'
+        "400":
+          description: Invalid category ID
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "500":
+          description: Failed to get category
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+      summary: Get a category by ID
+      tags:
+      - categories
+    patch:
+      consumes:
+      - application/json
+      description: Updates a category's title and/or description by its ID. Requires
+        admin privileges.
+      parameters:
+      - description: Category ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Category update data
+        in: body
+        name: category_update
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateRequestCategory'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Category updated successfully
+        "400":
+          description: Invalid category ID or request payload
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "401":
+          description: Unauthorized (token is missing or invalid)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "403":
+          description: Forbidden (user is not an admin)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "500":
+          description: Failed to update category
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a category
+      tags:
+      - categories
+  /categories/{id}/topics:
+    get:
+      description: Retrieves a list of topics for a category ID.
+      parameters:
+      - description: Category ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved topics
+          schema:
+            $ref: '#/definitions/response.TopicsResponse'
+        "400":
+          description: Invalid category ID
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+      summary: Get topics by category ID
+      tags:
+      - topics
+    post:
+      consumes:
+      - application/json
+      description: Creates a new topic in a category. Requires authentication.
+      parameters:
+      - description: Category ID to create topic in
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Topic data to create. ID, AuthorID, CategoryID, CreatedAt, UpdatedAt
+          will be ignored or overridden.
+        in: body
+        name: topic
+        required: true
+        schema:
+          $ref: '#/definitions/entity.Topic'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Topic created successfully
+          schema:
+            $ref: '#/definitions/response.IDResponse'
+        "400":
+          description: Invalid category ID or request payload
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "401":
+          description: Unauthorized (token is missing or invalid)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "403":
+          description: Forbidden (user is not authorized or trying to impersonate)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new topic
+      tags:
+      - topics
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user and returns user information along with a
+        new access token. A new refresh token is set as an HTTP-only cookie, and any
+        existing refresh token in the cookie is invalidated.
+      parameters:
+      - description: User Login Credentials
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/request.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully logged in
+          schema:
+            $ref: '#/definitions/response.LoginSuccessResponse'
+        "400":
+          description: Invalid request payload
+          schema:
+            $ref: '#/definitions/response.ErrorResponseAuth'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/response.ErrorResponseAuth'
+      summary: Log in an existing user
+      tags:
+      - auth
+  /logout:
+    post:
+      description: Logs out a user by deleting the refresh token from the server and
+        clearing the refresh token cookie.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully logged out
+          schema:
+            $ref: '#/definitions/response.LogoutSuccessResponse'
+      summary: Log out a user
+      tags:
+      - auth
+  /posts/{id}:
+    delete:
+      description: Deletes a post by its ID. Requires authentication and ownership
+        or admin role.
+      parameters:
+      - description: Post ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: Post deleted successfully
+          schema:
+            $ref: '#/definitions/response.SuccessMessageResponse'
+        "400":
+          description: Invalid post ID
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "401":
+          description: Unauthorized (token is missing or invalid)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "403":
+          description: Forbidden (user is not an owner or admin)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "404":
+          description: Post not found
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a post
+      tags:
+      - posts
+    patch:
+      consumes:
+      - application/json
+      description: Updates a post. Requires authentication and ownership or admin
+        role.
+      parameters:
+      - description: Post ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Post update data (only content)
+        in: body
+        name: post_update
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateRequestPost'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Post updated successfully
+          schema:
+            $ref: '#/definitions/response.SuccessMessageResponse'
+        "400":
+          description: Invalid post ID or request payload
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "401":
+          description: Unauthorized (token is missing or invalid)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "403":
+          description: Forbidden (user is not an owner or admin)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "404":
+          description: Post not found
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a post
+      tags:
+      - posts
+  /refresh:
+    post:
+      description: Uses a refresh token to generate a new access token and a new refresh
+        token. Refresh token is set as an HTTP-only cookie.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully refreshed tokens
+          schema:
+            $ref: '#/definitions/response.RefreshSuccessResponse'
+        "401":
+          description: Refresh token required or invalid/expired refresh token
+          schema:
+            $ref: '#/definitions/response.ErrorResponseAuth'
+      summary: Refresh access token
+      tags:
+      - auth
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account and returns user information along with
+        an access token. A refresh token is set as an HTTP-only cookie.
+      parameters:
+      - description: User Credentials
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/request.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully registered
+          schema:
+            $ref: '#/definitions/response.RegisterSuccessResponse'
+        "400":
+          description: Invalid request payload
+          schema:
+            $ref: '#/definitions/response.ErrorResponseAuth'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponseAuth'
+      summary: Register a new user
+      tags:
+      - auth
+  /topics/{id}:
+    delete:
+      description: Deletes a topic by its ID. Requires authentication and ownership
+        or role.
+      parameters:
+      - description: Topic ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: Topic deleted successfully
+          schema:
+            $ref: '#/definitions/response.SuccessMessageResponse'
+        "400":
+          description: Invalid topic ID
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "401":
+          description: Unauthorized (token is missing or invalid)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "403":
+          description: Forbidden (user is not an owner or admin)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "404":
+          description: Topic not found
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a topic
+      tags:
+      - topics
+    get:
+      description: Retrieves a specific topic by its ID.
+      parameters:
+      - description: Topic ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved topic
+          schema:
+            $ref: '#/definitions/response.TopicResponse'
+        "400":
+          description: Invalid topic ID
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "500":
+          description: Failed to get topic
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+      summary: Get a topic by ID
+      tags:
+      - topics
+    patch:
+      consumes:
+      - application/json
+      description: Updates a topic. Requires authentication and ownership or admin
+        role.
+      parameters:
+      - description: Topic ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Topic update data (only title)
+        in: body
+        name: topic_update
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateRequestTopic'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Topic updated successfully
+          schema:
+            $ref: '#/definitions/response.SuccessMessageResponse'
+        "400":
+          description: Invalid topic ID or request payload
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "401":
+          description: Unauthorized (token is missing or invalid)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "403":
+          description: Forbidden (user is not an owner or admin)
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "404":
+          description: Topic not found
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a topic
+      tags:
+      - topics
+  /topics/{id}/posts:
+    get:
+      description: Retrieves a list of posts for a topic ID.
+      parameters:
+      - description: Topic ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved posts
+          schema:
+            $ref: '#/definitions/response.PostsResponse'
+        "400":
+          description: Invalid topic ID
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "404":
+          description: Topic not found
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/response.ErrorResponseForum'
+      summary: Get posts by topic ID
+      tags:
+      - posts
+swagger: "2.0"

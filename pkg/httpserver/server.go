@@ -1,6 +1,10 @@
 package httpserver
 
-import "github.com/gin-gonic/gin"
+import (
+	"fmt"
+
+	"github.com/gin-gonic/gin"
+)
 
 type Server struct {
 	Engine  *gin.Engine
@@ -14,5 +18,6 @@ func New(address string) *Server {
 }
 
 func (s *Server) Run() {
+	fmt.Println(s.address)
 	go s.Engine.Run(s.address)
 }

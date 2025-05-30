@@ -4,12 +4,33 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+const (
+	_defaultMaxPoolSize  = 5
+	_defaultConnAttempts = 10
+	_defaultConnTimeout  = time.Second
+)
+
 type Postgres struct {
-	Pool *pgxpool.Pool
+	maxPoolSize  int
+	connAttempts int
+	connTimeout  time.Duration
+	Pool         DBPool
 }
+
+type DBPool interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Close()
+	Config() *pgxpool.Config
+}
+
+type Option func(*Postgres)
 
 var poolConfig = &pgxpool.Config{
 	MaxConns:          10,
@@ -58,5 +79,11 @@ func NewPostgresForum(ctx context.Context, url string) *Postgres {
 func (p *Postgres) Close() {
 	if p.Pool != nil {
 		p.Pool.Close()
+	}
+}
+
+func NewWithPool(pool DBPool) *Postgres {
+	return &Postgres{
+		Pool: pool,
 	}
 }

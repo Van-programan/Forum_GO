@@ -9,6 +9,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
+	_ "github.com/Van-programan/Forum_GO/docs"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -19,8 +20,15 @@ func NewAuthRouter(engine *gin.Engine, usecase usecase.AuthUsecase, jwt *jwt.JWT
 		Log:     log,
 	}
 
+	docs.SwaggerInfo.Title = "Forum Service API"
+	docs.SwaggerInfo.Description = "API for forum service"
+	docs.SwaggerInfo.Version = "1.0"
+	docs.SwaggerInfo.Host = "localhost:3100"
+	docs.SwaggerInfo.BasePath = "/"
+	docs.SwaggerInfo.Schemes = []string{"http"}
+
 	engine.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:3100"},
 		AllowMethods:     []string{"POST"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
 		AllowCredentials: true,
@@ -33,5 +41,5 @@ func NewAuthRouter(engine *gin.Engine, usecase usecase.AuthUsecase, jwt *jwt.JWT
 	engine.POST("/logout", h.Logout)
 	engine.GET("/check-session", h.CheckSession)
 
-	engine.GET("/swagger/auth/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }

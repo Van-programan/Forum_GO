@@ -14,12 +14,21 @@ import (
 	"github.com/rs/zerolog"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "github.com/Van-programan/Forum_GO/docs" // swagger docs
 )
 
 func NewForumRouter(engine *gin.Engine, categoryUsecase usecase.CategoryUsecase,
 	topicUsecase usecase.TopicUsecase, postUsecase usecase.PostUsecase,
 	jwt *jwt.JWT, log *zerolog.Logger, hub *ws.Hub, chatUsecase usecase.ChatUsecase,
 	userClient client.UserClient) {
+
+	// Initialize Swagger info
+	docs.SwaggerInfo.Title = "Forum Service API"
+	docs.SwaggerInfo.Description = "API for forum service"
+	docs.SwaggerInfo.Version = "1.0"
+	docs.SwaggerInfo.Host = "localhost:3101"
+	docs.SwaggerInfo.BasePath = "/"
+	docs.SwaggerInfo.Schemes = []string{"http"}
 
 	categoryHandler := &controller.CategoryHandler{
 		Usecase: categoryUsecase,
@@ -34,7 +43,7 @@ func NewForumRouter(engine *gin.Engine, categoryUsecase usecase.CategoryUsecase,
 	chatHandler := controller.NewChatHandler(hub, chatUsecase, userClient, log)
 
 	engine.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowOrigins:     []string{"http://localhost:3000"},
 		AllowMethods:     []string{"GET", "POST", "PATCH", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
 		AllowCredentials: true,
@@ -76,5 +85,5 @@ func NewForumRouter(engine *gin.Engine, categoryUsecase usecase.CategoryUsecase,
 		posts.PATCH("/:id", postHandler.Update)
 	}
 
-	engine.GET("/swagger/forum/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }

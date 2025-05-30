@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -49,9 +48,9 @@ func RunForumServer() {
 	}
 	defer pg.Close()
 
-	log.Fatalf("Successfully connected to database")
+	log.Println("Successfully connected to database")
 
-	migrationsPath := filepath.Join("migrations", "forum")
+	migrationsPath := "migrations/forum"
 
 	migrator := migrator.NewMigrator(dbURL, migrationsPath, *logger)
 	defer migrator.Close()

@@ -41,7 +41,8 @@ func NewMigrator(dbURL, migrationsPath string, logger zerolog.Logger) *Migrator 
 		Str("path", absPath).
 		Msg("Initializing migrator")
 
-	sourceURL := fmt.Sprintf("file://%s", absPath)
+	fmt.Println(absPath)
+	sourceURL := fmt.Sprintf("file://%s", migrationsPath)
 	fullDBURL := fmt.Sprintf("%s?sslmode=disable", dbURL)
 
 	var m *migrate.Migrate
